@@ -7,22 +7,13 @@ import { IRenderer } from '../../domain/repositories/IRenderer';
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
+import { HierarchicalLayoutEngine } from '../layout/HierarchicalLayoutEngine';
+import { LayoutPositioner } from '../layout/LayoutPositioner';
+import { VerticalAlignmentOptimizer } from '../layout/VerticalAlignmentOptimizer';
 
 interface MousePosition {
   x: number;
   y: number;
-}
-
-interface GraphNode {
-  outgoing: string[];
-  incoming: string[];
-  level: number;
-  position: number;
-}
-
-interface BarycenterItem {
-  name: string;
-  value: number;
 }
 
 export class CanvasRendererAdapter implements IRenderer {
@@ -79,8 +70,14 @@ export class CanvasRendererAdapter implements IRenderer {
   setData(entities: Entity[], relationships: Relationship[]): void {
     this.entities = entities;
     this.relationships = relationships;
-    this._initializePositions();
-    this.render();
+
+    // Apply auto-layout automatically if there are entities
+    if (this.entities.length > 0) {
+      this.autoLayout();
+    } else {
+      this._initializePositions();
+      this.render();
+    }
   }
 
   render(): void {
@@ -160,118 +157,56 @@ export class CanvasRendererAdapter implements IRenderer {
   }
 
   autoLayout(): void {
-    const horizontalSpacing = this.entityWidth + 120;
-    const verticalSpacing = 350;
-
-    // Reset positions before re-layout
     this.entityPositions.clear();
 
-    // Build graph structure
-    const graph = new Map<string, GraphNode>();
-    this.entities.forEach(entity => {
-      graph.set(entity.name, {
-        outgoing: [],
-        incoming: [],
-        level: -1,
-        position: 0
-      });
+    // Step 1: Build dependency graph
+    const dependencyGraph = HierarchicalLayoutEngine.buildDependencyGraph(
+      this.entities,
+      this.relationships
+    );
+
+    // Step 2: Compute hierarchical layers
+    let { layers } = HierarchicalLayoutEngine.computeLayers(
+      dependencyGraph,
+      this.entities
+    );
+
+    // Step 3: Optimize vertical alignment to reduce edge crossings
+    layers = VerticalAlignmentOptimizer.optimize(
+      layers,
+      this.relationships,
+      4  // Number of optimization iterations
+    );
+
+    // Step 4: Position entities based on optimized layers
+    const positions = LayoutPositioner.calculatePositions(layers, {
+      entityWidth: this.entityWidth,
+      horizontalSpacing: this.entityWidth + 120,
+      verticalSpacing: 150,
+      baseX: 100,
+      displayHeight: this.displayHeight
     });
 
-    // Register relationships (directed)
-    this.relationships.forEach(rel => {
-      const fromNode = graph.get(rel.from.entity);
-      const toNode = graph.get(rel.to.entity);
-      if (fromNode && toNode) {
-        fromNode.outgoing.push(rel.to.entity);
-        toNode.incoming.push(rel.from.entity);
-      }
-    });
+    // Apply positions
+    this.entityPositions = positions;
 
-    // Step 1: Find roots (entities without incoming relations)
-    let roots = this.entities
-      .map(e => e.name)
-      .filter(name => graph.get(name)!.incoming.length === 0);
+    // Step 5: Debug output
+    this._logLayoutDebugInfo(layers);
 
-    if (roots.length === 0) {
-      // If all have incoming edges (circular graph)
-      roots = [this.entities[0].name];
-    }
-
-    // Step 2: Level assignment (BFS)
-    const levels: string[][] = [];
-    const visited = new Set<string>();
-    let currentLevel = [...roots];
-    let levelIndex = 0;
-
-    while (currentLevel.length > 0) {
-      levels[levelIndex] = [];
-
-      for (const nodeName of currentLevel) {
-        if (!visited.has(nodeName)) {
-          visited.add(nodeName);
-          levels[levelIndex].push(nodeName);
-          graph.get(nodeName)!.level = levelIndex;
-        }
-      }
-
-      const next = new Set<string>();
-      for (const nodeName of currentLevel) {
-        const node = graph.get(nodeName)!;
-        node.outgoing.forEach(target => {
-          if (!visited.has(target)) next.add(target);
-        });
-      }
-
-      currentLevel = Array.from(next);
-      levelIndex++;
-      if (levelIndex > 20) break; // safety
-    }
-
-    // Handle unconnected entities (no relationships)
-    const unconnected = this.entities
-      .map(e => e.name)
-      .filter(n => !visited.has(n));
-    if (unconnected.length > 0) {
-      levels.push(unconnected);
-    }
-
-    // Step 3: Compute barycenter ordering within each level
-    for (let i = 1; i < levels.length; i++) {
-      const prevLevel = levels[i - 1];
-      const barycenters: BarycenterItem[] = levels[i].map(name => {
-        const parents = graph.get(name)!.incoming.filter(
-          p => graph.get(p)!.level === i - 1
-        );
-        if (parents.length === 0) return { name, value: 0 };
-        const avg =
-          parents.reduce(
-            (sum, p) => sum + prevLevel.indexOf(p),
-            0
-          ) / parents.length;
-        return { name, value: avg };
-      });
-      barycenters.sort((a, b) => a.value - b.value);
-      levels[i] = barycenters.map(b => b.name);
-    }
-
-    // Step 4: Assign final positions
-    const totalWidth = this.displayWidth;
-    const baseY = 100;
-
-    levels.forEach((level, i) => {
-      const count = level.length;
-      const totalLevelWidth = (count - 1) * horizontalSpacing;
-      const startX = (totalWidth - totalLevelWidth) / 2;
-
-      level.forEach((name, j) => {
-        const x = startX + j * horizontalSpacing;
-        const y = baseY + i * verticalSpacing;
-        this.entityPositions.set(name, new Position({ x, y }));
-      });
-    });
-
-    // Step 5: Render and fit
+    // Step 6: Fit to screen
     this.fitToScreen();
+  }
+
+  /**
+   * Log debug information about the layout
+   */
+  private _logLayoutDebugInfo(layers: Map<number, string[]>): void {
+    console.groupCollapsed('🧭 Auto Layout Layers (Left → Right)');
+    console.log(`Number of layers detected: ${layers.size}`);
+    for (const [i, names] of Array.from(layers.entries()).sort((a, b) => a[0] - b[0])) {
+      console.log(`Layer ${i}: ${names.join(', ')}`);
+    }
+    console.groupEnd();
   }
 
   getZoomLevel(): number {
