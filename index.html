@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Visual Designer - Real-time Entity Diagram Generator</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Monaco Editor (VS Code editor) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1>
+                    <i data-lucide="database"></i>
+                    ERP Visual Designer
+                </h1>
+                <span class="subtitle">Real-time Entity Relationship Diagram Generator</span>
+            </div>
+            <div class="header-right">
+                <button id="exportBtn" class="btn btn-primary">
+                    <i data-lucide="download"></i>
+                    Export Code
+                </button>
+                <button id="saveBtn" class="btn btn-secondary">
+                    <i data-lucide="save"></i>
+                    Save DSL
+                </button>
+                <button id="resetBtn" class="btn btn-danger">
+                    <i data-lucide="refresh-cw"></i>
+                    Reset
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Canvas Area (3/4 of screen) -->
+            <div class="canvas-area">
+                <div class="canvas-toolbar">
+                    <button id="zoomInBtn" class="tool-btn" title="Zoom In">
+                        <i data-lucide="zoom-in"></i>
+                    </button>
+                    <button id="zoomOutBtn" class="tool-btn" title="Zoom Out">
+                        <i data-lucide="zoom-out"></i>
+                    </button>
+                    <button id="fitBtn" class="tool-btn" title="Fit to Screen">
+                        <i data-lucide="maximize"></i>
+                    </button>
+                    <button id="autoLayoutBtn" class="tool-btn" title="Auto Layout">
+                        <i data-lucide="layout"></i>
+                    </button>
+                    <span class="zoom-level" id="zoomLevel">100%</span>
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="diagramCanvas"></canvas>
+                </div>
+                <div class="canvas-info">
+                    <span id="entityCount">0 entities</span>
+                    <span id="relationCount">0 relations</span>
+                </div>
+            </div>
+
+            <!-- DSL Editor Area (1/4 of screen) -->
+            <div class="editor-area">
+                <div class="editor-header">
+                    <h3>
+                        <i data-lucide="file-code"></i>
+                        DSL Editor
+                    </h3>
+                    <div class="editor-actions">
+                        <button id="formatBtn" class="editor-btn" title="Format DSL">
+                            <i data-lucide="align-left"></i>
+                        </button>
+                        <button id="validateBtn" class="editor-btn" title="Validate DSL">
+                            <i data-lucide="check-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="dslEditor"></div>
+                <div class="editor-status">
+                    <span id="statusIndicator" class="status-ok">
+                        <i data-lucide="check-circle"></i>
+                        Valid
+                    </span>
+                    <span id="errorMessage"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resize Handle -->
+        <div class="resize-handle" id="resizeHandle"></div>
+    </div>
+
+    <!-- Templates -->
+    <div id="templates" style="display: none;">
+        <div class="example-templates">
+            <button class="template-btn" data-template="blog">Blog System</button>
+            <button class="template-btn" data-template="ecommerce">E-Commerce</button>
+            <button class="template-btn" data-template="social">Social Network</button>
+        </div>
+    </div>
+
+    <!-- Clean Architecture Entry Point -->
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "erp-visual-designer-ts",
+  "version": "1.0.0",
+  "description": "Real-time Entity Relationship Diagram Generator with DSL - TypeScript Edition",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "erp",
+    "diagram",
+    "dsl",
+    "visual-designer",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^7.1.9"
+  }
+}
