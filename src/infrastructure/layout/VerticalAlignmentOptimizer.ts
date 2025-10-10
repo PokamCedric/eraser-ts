@@ -2,11 +2,12 @@
  * Vertical Alignment Optimizer
  *
  * Optimizes the vertical order of entities within each layer to minimize edge crossings.
- * Uses the barycenter method: entities are positioned based on the average position
- * of their connected neighbors.
+ * Uses the weighted barycenter method: entities are positioned based on the average position
+ * of their connected neighbors, with higher weight for connections to Primary Keys.
  */
 
 import { Relationship } from '../../domain/entities/Relationship';
+import { Entity } from '../../domain/entities/Entity';
 
 export class VerticalAlignmentOptimizer {
   /**
@@ -14,57 +15,39 @@ export class VerticalAlignmentOptimizer {
    *
    * Algorithm:
    * 1. For each layer (left to right)
-   * 2. Calculate barycenter for each entity based on connected entities in previous layer
+   * 2. Calculate weighted barycenter for each entity based on connected entities in previous layer
+   *    - Connections to Primary Keys have higher weight (priority towards top)
    * 3. Sort entities by barycenter value
    * 4. Repeat in reverse (right to left) for better results
    *
    * @param layers - Map of layer index to entity names
    * @param relationships - All relationships between entities
+   * @param entities - All entities (needed to check for Primary Keys)
    * @param iterations - Number of optimization passes (default: 4)
    */
   static optimize(
     layers: Map<number, string[]>,
     relationships: Relationship[],
+    entities: Entity[],
     iterations: number = 4
   ): Map<number, string[]> {
     const optimizedLayers = new Map(layers);
 
-    // Build adjacency maps for quick lookup
-    const adjacencyMap = this._buildAdjacencyMap(relationships);
+    // Build entity map for quick lookup
+    const entityMap = new Map<string, Entity>(
+      entities.map(e => [e.name, e])
+    );
 
     // Run multiple iterations for better convergence
     for (let iter = 0; iter < iterations; iter++) {
       // Forward pass: left to right
-      this._optimizeForward(optimizedLayers, adjacencyMap);
+      this._optimizeForward(optimizedLayers, relationships, entityMap);
 
       // Backward pass: right to left
-      this._optimizeBackward(optimizedLayers, adjacencyMap);
+      this._optimizeBackward(optimizedLayers, relationships, entityMap);
     }
 
     return optimizedLayers;
-  }
-
-  /**
-   * Build adjacency map: entity -> list of connected entities
-   */
-  private static _buildAdjacencyMap(
-    relationships: Relationship[]
-  ): Map<string, string[]> {
-    const adjacency = new Map<string, string[]>();
-
-    relationships.forEach(rel => {
-      const from = rel.from.entity;
-      const to = rel.to.entity;
-
-      // Bidirectional adjacency
-      if (!adjacency.has(from)) adjacency.set(from, []);
-      if (!adjacency.has(to)) adjacency.set(to, []);
-
-      adjacency.get(from)!.push(to);
-      adjacency.get(to)!.push(from);
-    });
-
-    return adjacency;
   }
 
   /**
@@ -72,7 +55,8 @@ export class VerticalAlignmentOptimizer {
    */
   private static _optimizeForward(
     layers: Map<number, string[]>,
-    adjacency: Map<string, string[]>
+    relationships: Relationship[],
+    entityMap: Map<string, Entity>
   ): void {
     const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
 
@@ -83,12 +67,13 @@ export class VerticalAlignmentOptimizer {
       const currentLayer = layers.get(currentLayerIndex)!;
       const previousLayer = layers.get(previousLayerIndex)!;
 
-      // Calculate barycenter for each entity in current layer
+      // Calculate weighted barycenter for each entity in current layer
       const barycenters = currentLayer.map(entity => {
-        const barycenter = this._calculateBarycenter(
+        const barycenter = this._calculateWeightedBarycenter(
           entity,
           previousLayer,
-          adjacency
+          relationships,
+          entityMap
         );
         return { entity, barycenter };
       });
@@ -109,7 +94,8 @@ export class VerticalAlignmentOptimizer {
    */
   private static _optimizeBackward(
     layers: Map<number, string[]>,
-    adjacency: Map<string, string[]>
+    relationships: Relationship[],
+    entityMap: Map<string, Entity>
   ): void {
     const sortedLayers = Array.from(layers.keys()).sort((a, b) => b - a);
 
@@ -120,12 +106,13 @@ export class VerticalAlignmentOptimizer {
       const currentLayer = layers.get(currentLayerIndex)!;
       const nextLayer = layers.get(nextLayerIndex)!;
 
-      // Calculate barycenter for each entity in current layer
+      // Calculate weighted barycenter for each entity in current layer
       const barycenters = currentLayer.map(entity => {
-        const barycenter = this._calculateBarycenter(
+        const barycenter = this._calculateWeightedBarycenter(
           entity,
           nextLayer,
-          adjacency
+          relationships,
+          entityMap
         );
         return { entity, barycenter };
       });
@@ -142,36 +129,74 @@ export class VerticalAlignmentOptimizer {
   }
 
   /**
-   * Calculate barycenter (average position) of connected entities
+   * Calculate weighted barycenter (average position) of connected entities
+   * Connections to/from Primary Keys have higher weight (bias towards top)
    *
-   * @param entity - Current entity
+   * @param entity - Current entity name
    * @param referenceLayer - Layer to calculate barycenter from
-   * @param adjacency - Adjacency map
-   * @returns Average position (0-based index in reference layer)
+   * @param relationships - All relationships
+   * @param entityMap - Map of entity name to Entity object
+   * @returns Weighted average position (0-based index in reference layer)
    */
-  private static _calculateBarycenter(
+  private static _calculateWeightedBarycenter(
     entity: string,
     referenceLayer: string[],
-    adjacency: Map<string, string[]>
+    relationships: Relationship[],
+    entityMap: Map<string, Entity>
   ): number {
-    const neighbors = adjacency.get(entity) || [];
+    const weightedPositions: { position: number; weight: number }[] = [];
 
-    // Find neighbors that are in the reference layer
-    const connectedPositions: number[] = [];
-    neighbors.forEach(neighbor => {
-      const position = referenceLayer.indexOf(neighbor);
-      if (position !== -1) {
-        connectedPositions.push(position);
+    // Find all relationships involving this entity
+    relationships.forEach(rel => {
+      let connectedEntity: string | null = null;
+      let sourceField: string | null = null;
+      let isPrimaryKeyConnection = false;
+
+      // Check if this relationship connects to reference layer
+      if (rel.from.entity === entity && referenceLayer.includes(rel.to.entity)) {
+        connectedEntity = rel.to.entity;
+        sourceField = rel.from.field;
+      } else if (rel.to.entity === entity && referenceLayer.includes(rel.from.entity)) {
+        connectedEntity = rel.from.entity;
+        sourceField = rel.from.field;
+      }
+
+      if (connectedEntity) {
+        // Check if the source field is a Primary Key
+        const sourceEntity = entityMap.get(
+          rel.from.entity === entity ? entity : rel.from.entity
+        );
+
+        if (sourceEntity) {
+          const field = sourceEntity.fields.find(f => f.name === sourceField);
+          isPrimaryKeyConnection = field?.isPrimaryKey ?? false;
+        }
+
+        const position = referenceLayer.indexOf(connectedEntity);
+        if (position !== -1) {
+          // Primary Key connections get higher weight (0.3 = bias towards top)
+          // Regular connections get normal weight (1.0)
+          const weight = isPrimaryKeyConnection ? 0.3 : 1.0;
+          weightedPositions.push({ position, weight });
+        }
       }
     });
 
     // If no connections, return middle position
-    if (connectedPositions.length === 0) {
+    if (weightedPositions.length === 0) {
       return referenceLayer.length / 2;
     }
 
-    // Calculate average position (barycenter)
-    const sum = connectedPositions.reduce((a, b) => a + b, 0);
-    return sum / connectedPositions.length;
+    // Calculate weighted average position
+    const weightedSum = weightedPositions.reduce(
+      (sum, item) => sum + item.position * item.weight,
+      0
+    );
+    const totalWeight = weightedPositions.reduce(
+      (sum, item) => sum + item.weight,
+      0
+    );
+
+    return weightedSum / totalWeight;
   }
 }

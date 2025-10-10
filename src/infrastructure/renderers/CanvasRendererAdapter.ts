@@ -10,6 +10,7 @@ import { Position } from '../../domain/value-objects/Position';
 import { HierarchicalLayoutEngine } from '../layout/HierarchicalLayoutEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { VerticalAlignmentOptimizer } from '../layout/VerticalAlignmentOptimizer';
+import { FieldOrderingOptimizer } from '../layout/FieldOrderingOptimizer';
 
 interface MousePosition {
   x: number;
@@ -172,28 +173,47 @@ export class CanvasRendererAdapter implements IRenderer {
     );
 
     // Step 3: Optimize vertical alignment to reduce edge crossings
+    // Prioritizes connections to Primary Keys (placed higher)
     layers = VerticalAlignmentOptimizer.optimize(
       layers,
       this.relationships,
+      this.entities,  // Pass entities to detect Primary Keys
       4  // Number of optimization iterations
     );
 
     // Step 4: Position entities based on optimized layers
-    const positions = LayoutPositioner.calculatePositions(layers, {
-      entityWidth: this.entityWidth,
-      horizontalSpacing: this.entityWidth + 120,
-      verticalSpacing: 150,
-      baseX: 100,
-      displayHeight: this.displayHeight
-    });
+    const positions = LayoutPositioner.calculatePositions(
+      layers,
+      this.entities,  // Pass entities to calculate heights
+      {
+        entityWidth: this.entityWidth,
+        entityHeaderHeight: this.entityHeaderHeight,
+        entityFieldHeight: this.entityFieldHeight,
+        horizontalSpacing: this.entityWidth + 120,
+        verticalSpacing: 30,  // Minimum gap between entities
+        baseX: 100,
+        displayHeight: this.displayHeight
+      }
+    );
 
     // Apply positions
     this.entityPositions = positions;
 
-    // Step 5: Debug output
+    // Step 5: Optimize field ordering to minimize connection crossings
+    FieldOrderingOptimizer.optimizeFieldOrder(
+      this.entities,
+      this.relationships,
+      this.entityPositions,
+      this.entityHeaderHeight,
+      this.entityFieldHeight,
+      layers,
+      2  // Number of optimization iterations
+    );
+
+    // Step 6: Debug output
     this._logLayoutDebugInfo(layers);
 
-    // Step 6: Fit to screen
+    // Step 7: Fit to screen
     this.fitToScreen();
   }
 
@@ -450,6 +470,19 @@ export class CanvasRendererAdapter implements IRenderer {
     }
   }
 
+  /**
+   * Get the Y coordinate of a specific field within an entity
+   */
+  private _getFieldYPosition(entity: Entity, fieldName: string, entityPos: Position): number {
+    const fieldIndex = entity.fields.findIndex(f => f.name === fieldName);
+    if (fieldIndex === -1) {
+      // Field not found, default to entity center
+      return entityPos.y + this.entityHeaderHeight + (entity.fields.length * this.entityFieldHeight) / 2;
+    }
+    // Return the vertical center of the field
+    return entityPos.y + this.entityHeaderHeight + (fieldIndex * this.entityFieldHeight) + (this.entityFieldHeight / 2);
+  }
+
   private _drawRelationship(ctx: CanvasRenderingContext2D, relationship: Relationship): void {
     const fromEntity = this.entities.find(e => e.name === relationship.from.entity);
     const toEntity = this.entities.find(e => e.name === relationship.to.entity);
@@ -461,37 +494,35 @@ export class CanvasRendererAdapter implements IRenderer {
 
     if (!fromPos || !toPos) return;
 
-    // Calculate entity centers and dimensions
-    const fromCenterX = fromPos.x + this.entityWidth / 2;
-    const fromCenterY = fromPos.y + this.entityHeaderHeight / 2;
-    const toCenterX = toPos.x + this.entityWidth / 2;
-    const toCenterY = toPos.y + this.entityHeaderHeight / 2;
+    // Get field-specific Y positions
+    const fromFieldY = this._getFieldYPosition(fromEntity, relationship.from.field, fromPos);
+    const toFieldY = this._getFieldYPosition(toEntity, relationship.to.field, toPos);
 
-    // Determine which side to connect from based on relative positions
+    // Calculate entity centers for X positioning logic
+    const fromCenterX = fromPos.x + this.entityWidth / 2;
+    const toCenterX = toPos.x + this.entityWidth / 2;
+
+    // Determine which side to connect from based on relative horizontal positions
     const dx = toCenterX - fromCenterX;
-    const dy = toCenterY - fromCenterY;
 
     let fromX: number, fromY: number, toX: number, toY: number;
 
-    // Determine connection points based on relative positions
-    if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal connection
-      if (dx > 0) {
-        // From is left of To
-        fromX = fromPos.x + this.entityWidth;
-        fromY = fromCenterY;
-        toX = toPos.x;
-        toY = toCenterY;
-      } else {
-        // From is right of To
-        fromX = fromPos.x;
-        fromY = fromCenterY;
-        toX = toPos.x + this.entityWidth;
-        toY = toCenterY;
-      }
+    // Horizontal connection logic (left-to-right layout)
+    if (dx > 0) {
+      // From is left of To - connect from right edge of 'from' to left edge of 'to'
+      fromX = fromPos.x + this.entityWidth;
+      fromY = fromFieldY;
+      toX = toPos.x;
+      toY = toFieldY;
+    } else if (dx < 0) {
+      // From is right of To - connect from left edge of 'from' to right edge of 'to'
+      fromX = fromPos.x;
+      fromY = fromFieldY;
+      toX = toPos.x + this.entityWidth;
+      toY = toFieldY;
     } else {
-      // Vertical connection
-      if (dy > 0) {
+      // Entities are vertically aligned - use top/bottom connection
+      if (fromFieldY < toFieldY) {
         // From is above To
         fromX = fromCenterX;
         fromY = fromPos.y + this.entityHeaderHeight + (fromEntity.fields.length * this.entityFieldHeight);
@@ -513,16 +544,19 @@ export class CanvasRendererAdapter implements IRenderer {
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
 
-    // Draw line with simple routing
+    // Draw line with orthogonal routing for horizontal connections
     ctx.beginPath();
     ctx.moveTo(fromX, fromY);
 
-    // Use straight or orthogonal routing based on connection direction
-    if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal - use direct line
+    // For horizontal layout, use orthogonal routing with midpoint
+    if (dx !== 0) {
+      // Horizontal connection - use orthogonal routing
+      const midX = (fromX + toX) / 2;
+      ctx.lineTo(midX, fromY);
+      ctx.lineTo(midX, toY);
       ctx.lineTo(toX, toY);
     } else {
-      // Vertical - use orthogonal routing
+      // Vertical connection - direct line with midpoint
       const midY = (fromY + toY) / 2;
       ctx.lineTo(fromX, midY);
       ctx.lineTo(toX, midY);
