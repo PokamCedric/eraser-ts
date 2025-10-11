@@ -70,18 +70,38 @@ Pour chaque field d'une entité, on calcule le **barycentre** (position Y moyenn
        → Barycentre = 100
    ```
 
-2. **Tri des fields par barycentre**
-   ```typescript
-   sortedFields = fields.sort((a, b) => barycenterA - barycenterB)
+2. **Dispersion des fields connectés (maximiser l'espacement)**
 
-   Exemple:
-     inviterId (bary = 100) → position 0
-     workspaceId (bary = 400) → position 1
+   Au lieu de simplement trier, on **disperse** les fields connectés pour maximiser l'espace entre eux:
+
+   ```typescript
+   // Catégories de fields:
+   1. PK sans connexion       → Position 0
+   2. Fields connectés        → Dispersés uniformément
+   3. Fields non connectés    → Remplissent les trous
+
+   Exemple avec Users (4 fields):
+     - id (PK, pas de connexion)
+     - profileId (connecté, bary = 400)
+     - username (non connecté)
+     - email (non connecté)
+
+   Résultat de dispersion:
+     Position 0: id           (PK prioritaire)
+     Position 1: username     (non connecté - remplissage)
+     Position 2: email        (non connecté - remplissage)
+     Position 3: profileId    (connecté - dispersé à la fin)
+
+   Si 2 fields connectés (id PK connecté + profileId):
+     Position 0: id           (PK connecté - haut)
+     Position 1: username     (remplissage)
+     Position 2: email        (remplissage)
+     Position 3: profileId    (connecté - dispersé au maximum)
    ```
 
 3. **Réordonnancement de l'entité**
    ```typescript
-   entity.reorderFields(sortedFields)
+   entity.reorderFields(dispersedFields)
    ```
 
 4. **Itérations forward/backward**
@@ -249,11 +269,13 @@ Résultat final:
 
 ## Avantages
 
-- ✅ **Minimise les croisements** : Chaque field est placé près de ses connexions
+- ✅ **Minimise les croisements** : Fields connectés dispersés au maximum
+- ✅ **Maximise l'espacement** : Distance maximale entre connexions
 - ✅ **Converge rapidement** : 2 itérations suffisent généralement
 - ✅ **Préserve la logique métier** : Primary keys sans connexions restent en position 0
 - ✅ **S'adapte dynamiquement** : Fonctionne avec n'importe quelle topologie de graphe
 - ✅ **Convention ERD standard** : PK toujours en premier (sauf en cas de conflit avec connexions)
+- ✅ **Dispersion intelligente** : Fields connectés espacés uniformément pour clarté visuelle
 
 ## Limitations
 

@@ -108,36 +108,155 @@ export class FieldOrderingOptimizer {
         fieldBarycenters.set(field.name, barycenter);
       }
 
-      // Sort fields by barycenter with special handling for primary keys
-      const sortedFieldNames = entity.fields
-        .map(f => ({ name: f.name, isPrimaryKey: f.isPrimaryKey }))
-        .sort((a, b) => {
-          const baryA = fieldBarycenters.get(a.name) ?? Infinity;
-          const baryB = fieldBarycenters.get(b.name) ?? Infinity;
+      // Disperse connected fields to maximize spacing
+      const sortedFieldNames = this._disperseConnectedFields(
+        entity.name,
+        entity.fields,
+        fieldBarycenters,
+        relationships,
+        entityLayer,
+        entityPositions
+      );
 
-          // Primary keys without connections (Infinity) always come first
-          const hasConnectionA = baryA !== Infinity;
-          const hasConnectionB = baryB !== Infinity;
-
-          // If PK has no connections, it goes to position 0
-          if (a.isPrimaryKey && !hasConnectionA && b.isPrimaryKey && !hasConnectionB) {
-            return 0; // Both PKs without connections, keep original order
-          }
-          if (a.isPrimaryKey && !hasConnectionA) {
-            return -1; // PK without connection goes first
-          }
-          if (b.isPrimaryKey && !hasConnectionB) {
-            return 1; // PK without connection goes first
-          }
-
-          // Otherwise, sort by barycenter (including PKs with connections)
-          return baryA - baryB;
-        })
-        .map(f => f.name);
+      // Debug: Log dispersion for users
+      if (entity.name === 'users') {
+        console.log(`[FieldOrdering] Users field dispersion:`);
+        entity.fields.forEach(f => {
+          const bary = fieldBarycenters.get(f.name);
+          const hasConnection = bary !== Infinity;
+          console.log(`  ${f.name}: ${hasConnection ? `connected (bary=${bary})` : 'no connection'}`);
+        });
+        console.log(`  Final order:`, sortedFieldNames);
+      }
 
       // Reorder fields in the entity
       entity.reorderFields(sortedFieldNames);
     }
+  }
+
+  /**
+   * Disperse connected fields to maximize spacing between them
+   *
+   * Strategy:
+   * 1. Primary keys → Position 0 (always)
+   * 2. Connected non-PK fields → Sorted by target entity position in layer, then dispersed
+   * 3. Non-connected fields → Fill the gaps
+   */
+  private static _disperseConnectedFields(
+    entityName: string,
+    fields: any[],
+    fieldBarycenters: Map<string, number>,
+    relationships: Relationship[],
+    _entityLayer: Map<string, number>,
+    entityPositions: Map<string, Position>
+  ): string[] {
+    // Separate fields into categories
+    const primaryKeys: string[] = [];
+    const connectedFieldsNonPK: Array<{ name: string; targetY: number }> = [];
+    const nonConnectedFields: string[] = [];
+
+    fields.forEach(field => {
+      const barycenter = fieldBarycenters.get(field.name) ?? Infinity;
+      const hasConnection = barycenter !== Infinity;
+
+      if (field.isPrimaryKey) {
+        // ALL primary keys go to position 0 (priority absolute)
+        primaryKeys.push(field.name);
+      } else if (hasConnection) {
+        // Find target entity Y position
+        const targetY = this._getTargetEntityY(
+          entityName,
+          field.name,
+          relationships,
+          entityPositions
+        );
+        connectedFieldsNonPK.push({ name: field.name, targetY });
+      } else {
+        nonConnectedFields.push(field.name);
+      }
+    });
+
+    // Sort connected non-PK fields by target entity Y position (not barycenter!)
+    connectedFieldsNonPK.sort((a, b) => a.targetY - b.targetY);
+
+    // Calculate total positions available
+    const totalFields = fields.length;
+    const numPK = primaryKeys.length;
+    const numConnected = connectedFieldsNonPK.length;
+
+    // Build final order with maximum dispersion
+    const result: string[] = new Array(totalFields);
+
+    // 1. Place ALL PKs at position 0 (and following if multiple PKs)
+    let currentIndex = 0;
+    primaryKeys.forEach(fieldName => {
+      result[currentIndex++] = fieldName;
+    });
+
+    // 2. Disperse connected non-PK fields across remaining positions
+    if (numConnected > 0) {
+      const availableSlots = totalFields - numPK;
+
+      if (numConnected === 1) {
+        // Only one connected field: place it at the end
+        result[totalFields - 1] = connectedFieldsNonPK[0].name;
+      } else {
+        // Multiple connected fields: distribute evenly in remaining space
+        const step = availableSlots / numConnected;
+        connectedFieldsNonPK.forEach((field, index) => {
+          const position = numPK + Math.min(
+            availableSlots - 1,
+            Math.round((index + 0.5) * step)
+          );
+          result[position] = field.name;
+        });
+      }
+    }
+
+    // 3. Fill gaps with non-connected fields
+    let nonConnectedIndex = 0;
+    for (let i = 0; i < totalFields; i++) {
+      if (result[i] === undefined) {
+        result[i] = nonConnectedFields[nonConnectedIndex++];
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get the Y position of the target entity for a field
+   */
+  private static _getTargetEntityY(
+    entityName: string,
+    fieldName: string,
+    relationships: Relationship[],
+    entityPositions: Map<string, Position>
+  ): number {
+    // Find the relationship for this field
+    for (const rel of relationships) {
+      let targetEntityName: string | null = null;
+
+      // Check if this field is source (outgoing connection)
+      if (rel.from.entity === entityName && rel.from.field === fieldName) {
+        targetEntityName = rel.to.entity;
+      }
+      // Check if this field is target (incoming connection)
+      else if (rel.to.entity === entityName && rel.to.field === fieldName) {
+        targetEntityName = rel.from.entity;
+      }
+
+      // Return the Y position of the target entity
+      if (targetEntityName) {
+        const targetPos = entityPositions.get(targetEntityName);
+        if (targetPos) {
+          return targetPos.y;
+        }
+      }
+    }
+
+    // No connection found, return high value (will sort to end)
+    return Infinity;
   }
 
   /**

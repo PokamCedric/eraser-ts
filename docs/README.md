@@ -121,7 +121,19 @@ setData(entities: Entity[], relationships: Relationship[]): void {
    // 2 itérations: forward → backward
    ```
 
-6. **Rendu final avec connexions au niveau des propriétés**
+6. **Ajustement de l'espacement par alignement des connexions**
+   - Module: [`ConnectionAlignedSpacing`](../src/infrastructure/layout/ConnectionAlignedSpacing.ts)
+   - Ajuste les positions Y des entités pour que les connexions soient droites ou descendantes
+   - **Règle**: Pour deux fields consécutifs, la connexion du field inférieur doit pointer vers une entité plus basse
+   ```typescript
+   // Calcul de la position Y idéale basée sur les connexions entrantes
+   idealY = average(incomingConnectionsY) - firstFieldOffset
+
+   // Réajustement avec espacement minimum
+   newY = max(currentY, idealY)
+   ```
+
+7. **Rendu final avec connexions au niveau des propriétés**
    - Les relations connectent les propriétés spécifiques (fields) entre entités
    - Positionnement Y calculé selon l'index du field dans l'entité
    ```typescript
@@ -186,8 +198,9 @@ Layer 2: users
 - ✅ **Robuste** : Gère tous les cas (cycles, self-loops, isolés)
 - ✅ **Sans chevauchement** : Hauteurs calculées dynamiquement selon le nombre de propriétés
 - ✅ **Connexions précises** : Les relations pointent vers les propriétés spécifiques, pas les centres d'entités
-- ✅ **Croisements minimisés (entités)** : Algorithme du barycentre pour optimiser l'alignement vertical
+- ✅ **Croisements minimisés (entités)** : Algorithme du barycentre pondéré par Primary Keys
 - ✅ **Croisements minimisés (fields)** : Réordonnancement intelligent des propriétés dans chaque entité
+- ✅ **Espacement optimisé** : Ajustement des positions Y pour connexions droites ou descendantes
 
 ---
 
@@ -197,12 +210,14 @@ Layer 2: users
 - **Algorithme de classification hiérarchique** : [`docs/hierarchical-layout-algorithm.md`](./hierarchical-layout-algorithm.md)
 - **Alignement vertical pondéré par PK** : [`docs/pk-weighted-vertical-alignment.md`](./pk-weighted-vertical-alignment.md)
 - **Optimisation de l'ordre des fields** : [`docs/field-ordering-optimization.md`](./field-ordering-optimization.md)
+- **Espacement aligné sur connexions** : [`docs/connection-aligned-spacing.md`](./connection-aligned-spacing.md)
 
 ### Modules de layout
 - **Moteur hiérarchique** : [`src/infrastructure/layout/HierarchicalLayoutEngine.ts`](../src/infrastructure/layout/HierarchicalLayoutEngine.ts)
 - **Positionneur** : [`src/infrastructure/layout/LayoutPositioner.ts`](../src/infrastructure/layout/LayoutPositioner.ts)
 - **Optimiseur vertical (entités)** : [`src/infrastructure/layout/VerticalAlignmentOptimizer.ts`](../src/infrastructure/layout/VerticalAlignmentOptimizer.ts)
 - **Optimiseur de l'ordre des fields** : [`src/infrastructure/layout/FieldOrderingOptimizer.ts`](../src/infrastructure/layout/FieldOrderingOptimizer.ts)
+- **Espacement aligné sur connexions** : [`src/infrastructure/layout/ConnectionAlignedSpacing.ts`](../src/infrastructure/layout/ConnectionAlignedSpacing.ts)
 
 ### Renderer
 - **Adapter Canvas** : [`src/infrastructure/renderers/CanvasRendererAdapter.ts`](../src/infrastructure/renderers/CanvasRendererAdapter.ts)

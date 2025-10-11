@@ -56,14 +56,15 @@ export class HierarchicalLayoutEngine {
    * Compute hierarchical layers using inverted algorithm
    *
    * Algorithm:
-   * - Leaves (nobody depends on them) → Layer 0
-   * - Others → 1 + max(layer of nodes that depend on them)
+   * - Roots (don't depend on anyone) → Layer max (right)
+   * - Leaves (depend on others) → Layer 0 (left)
+   * - Layer = max(layer of dependencies) + 1
    */
   static computeLayers(
     dependencyGraph: DependencyGraph,
     entities: Entity[]
   ): LayerResult {
-    const { reverseGraph, nodes } = dependencyGraph;
+    const { graph, nodes } = dependencyGraph;
     const layerOf = new Map<string, number>();
     const visited = new Set<string>();
 
@@ -80,16 +81,17 @@ export class HierarchicalLayoutEngine {
 
       visited.add(node);
 
-      // Get all nodes that depend on this one
-      const dependents = reverseGraph.get(node) || [];
+      // Get all nodes that this node depends on
+      const dependencies = graph.get(node) || [];
 
-      if (dependents.length === 0) {
-        // Leaf: nobody depends on this node
+      if (dependencies.length === 0) {
+        // Root: doesn't depend on anyone - rightmost layer
         layerOf.set(node, 0);
       } else {
-        // Layer = 1 + max(layer of dependents)
-        const maxDependentLayer = Math.max(...dependents.map(dep => computeLayer(dep)));
-        layerOf.set(node, maxDependentLayer + 1);
+        // Layer = max(layer of dependencies) + 1
+        // This places nodes that depend on layer N at layer N+1
+        const maxDependencyLayer = Math.max(...dependencies.map(dep => computeLayer(dep)));
+        layerOf.set(node, maxDependencyLayer + 1);
       }
 
       visited.delete(node);
@@ -98,6 +100,15 @@ export class HierarchicalLayoutEngine {
 
     // Compute layers for all nodes
     nodes.forEach(n => computeLayer(n));
+
+    // Invert layers: nodes with highest layer should be rightmost
+    // Find max layer
+    const maxLayer = Math.max(...Array.from(layerOf.values()));
+
+    // Invert: layer N becomes (maxLayer - N)
+    for (const [node, layer] of layerOf.entries()) {
+      layerOf.set(node, maxLayer - layer);
+    }
 
     // Group nodes by layer
     const layers = new Map<number, string[]>();

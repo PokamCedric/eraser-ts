@@ -11,6 +11,7 @@ import { HierarchicalLayoutEngine } from '../layout/HierarchicalLayoutEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { VerticalAlignmentOptimizer } from '../layout/VerticalAlignmentOptimizer';
 import { FieldOrderingOptimizer } from '../layout/FieldOrderingOptimizer';
+import { ConnectionAlignedSpacing } from '../layout/ConnectionAlignedSpacing';
 
 interface MousePosition {
   x: number;
@@ -207,13 +208,23 @@ export class CanvasRendererAdapter implements IRenderer {
       this.entityHeaderHeight,
       this.entityFieldHeight,
       layers,
-      2  // Number of optimization iterations
+      1  // Number of optimization iterations (reduced to preserve dispersion)
     );
 
-    // Step 6: Debug output
+    // Step 6: Adjust Y spacing to align connections (minimize crossings)
+    ConnectionAlignedSpacing.optimizeSpacing(
+      this.entities,
+      this.relationships,
+      this.entityPositions,
+      layers,
+      this.entityHeaderHeight,
+      this.entityFieldHeight
+    );
+
+    // Step 7: Debug output
     this._logLayoutDebugInfo(layers);
 
-    // Step 7: Fit to screen
+    // Step 8: Fit to screen
     this.fitToScreen();
   }
 
