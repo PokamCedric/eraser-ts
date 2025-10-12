@@ -140,6 +140,27 @@ if (!layerOf.has(entity)) {
 
 Voir [HierarchicalLayoutEngine.ts](../src/infrastructure/layout/HierarchicalLayoutEngine.ts#L55-L120) pour l'implémentation complète.
 
+## Test
+
+Un script Python de test est disponible dans [algo2.py](../algo2.py) pour valider l'algorithme de manière isolée.
+
+**Exécution** :
+```bash
+python algo2.py
+```
+
+**Résultat attendu** :
+```
+Number of layers detected: 4
+
+Layer 0: comments, post_tags
+Layer 1: posts, tags, user_roles
+Layer 2: role_permissions, users
+Layer 3: permissions, profiles, roles, teams
+```
+
+Ce script permet de tester rapidement l'algorithme sans avoir besoin de compiler le projet TypeScript.
+
 ## Exemple visuel
 
 ```
