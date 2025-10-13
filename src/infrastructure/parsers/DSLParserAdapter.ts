@@ -7,6 +7,7 @@ import { Entity } from '../../domain/entities/Entity';
 import { Field } from '../../domain/entities/Field';
 import { Relationship } from '../../domain/entities/Relationship';
 import { IDiagramRepository, ParseDSLResult, ParseError } from '../../domain/repositories/IDiagramRepository';
+import { addFieldToEntity } from '../../data/models/utils';
 
 interface Metadata {
   [key: string]: string;
@@ -75,7 +76,7 @@ export class DSLParserAdapter implements IDiagramRepository {
         else if (currentEntity) {
           const field = this._parseField(line);
           if (field) {
-            currentEntity.addField(field);
+            addFieldToEntity(currentEntity, field);
           }
         }
       }

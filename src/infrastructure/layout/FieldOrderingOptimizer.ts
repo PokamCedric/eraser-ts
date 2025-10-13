@@ -8,6 +8,7 @@
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
+import { reorderEntityFields } from '../../data/models/utils';
 
 export class FieldOrderingOptimizer {
   /**
@@ -130,7 +131,7 @@ export class FieldOrderingOptimizer {
       }
 
       // Reorder fields in the entity
-      entity.reorderFields(sortedFieldNames);
+      reorderEntityFields(entity, sortedFieldNames);
     }
   }
 

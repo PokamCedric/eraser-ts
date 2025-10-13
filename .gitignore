@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 build/
+__pycache__/
 
 # Environment variables
 .env

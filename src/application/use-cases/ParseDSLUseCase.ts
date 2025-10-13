@@ -6,6 +6,7 @@
 import { IDiagramRepository, ParseError } from '../../domain/repositories/IDiagramRepository';
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
+import { validateEntity, validateRelationship } from '../../data/models/utils';
 
 export interface ParseDSLResult {
   entities: Entity[];
@@ -33,7 +34,7 @@ export class ParseDSLUseCase {
       // Validate all entities
       const entityErrors: ParseError[] = [];
       for (const entity of result.entities) {
-        const validation = entity.validate();
+        const validation = validateEntity(entity);
         if (!validation.isValid) {
           entityErrors.push({
             message: `Entity '${entity.name}': ${validation.error}`,
@@ -45,7 +46,7 @@ export class ParseDSLUseCase {
       // Validate all relationships
       const relationErrors: ParseError[] = [];
       for (const relationship of result.relationships) {
-        const validation = relationship.validate();
+        const validation = validateRelationship(relationship);
         if (!validation.isValid) {
           relationErrors.push({
             message: `Relationship: ${validation.error}`,

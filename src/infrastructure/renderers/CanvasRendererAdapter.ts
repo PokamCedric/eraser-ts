@@ -12,6 +12,7 @@ import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { VerticalAlignmentOptimizer } from '../layout/VerticalAlignmentOptimizer';
 import { FieldOrderingOptimizer } from '../layout/FieldOrderingOptimizer';
 import { ConnectionAlignedSpacing } from '../layout/ConnectionAlignedSpacing';
+import { getRelationshipCardinality } from '../../data/models/utils';
 
 interface MousePosition {
   x: number;
@@ -598,7 +599,7 @@ export class CanvasRendererAdapter implements IRenderer {
     ctx.font = 'bold 12px -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(relationship.getCardinality(), labelX, labelY - 5);
+    ctx.fillText(getRelationshipCardinality(relationship), labelX, labelY - 5);
   }
 
   private _drawCardinalityMarkers(ctx: CanvasRenderingContext2D, relationship: Relationship, fromX: number, fromY: number, toX: number, toY: number, color: string): void {
