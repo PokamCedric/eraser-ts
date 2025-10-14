@@ -1,0 +1,5 @@
+// Simple example: Blog system
+// Comments depend on Posts depend on Users
+
+comments.postId > posts.id
+posts.authorId > users.id

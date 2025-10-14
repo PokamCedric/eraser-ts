@@ -1,0 +1,20 @@
+// Test WITHOUT the reversed relation: projects.id < posts.authorId
+
+users.profileId - profiles.id
+posts.authorId > users.id
+users.id > teams.id
+comments.postId > posts.id
+tags.userId > users.id
+post_tags.postId > posts.id
+post_tags.tagId > tags.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+projects.teamId > teams.id
+milestones.projectId > projects.id
+attachments.postId > posts.id
+notifications.userId > users.id
+user_projects.userId > users.id
+user_projects.projectId > projects.id
+comments.userId > users.id

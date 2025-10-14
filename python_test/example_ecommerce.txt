@@ -1,0 +1,26 @@
+// E-commerce example
+// Hierarchical structure: Products and Users at the top
+// Orders in the middle, Order Items at the bottom
+
+// Orders depend on Users and Addresses
+orders.userId > users.id
+orders.shippingAddressId > addresses.id
+orders.billingAddressId > addresses.id
+
+// Addresses depend on Users
+addresses.userId > users.id
+
+// Order Items depend on Orders and Products
+order_items.orderId > orders.id
+order_items.productId > products.id
+
+// Reviews depend on Products and Users
+reviews.productId > products.id
+reviews.userId > users.id
+
+// Shopping Cart depends on Users
+cart_items.userId > users.id
+cart_items.productId > products.id
+
+// Payments depend on Orders
+payments.orderId > orders.id

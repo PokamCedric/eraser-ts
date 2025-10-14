@@ -1,0 +1,44 @@
+// ============================================
+// RELATIONSHIPS
+// ============================================
+
+// One-to-One: Users to Profiles
+// Each user has exactly one profile
+users.profileId - profiles.id
+
+// Many-to-One: Posts to Users
+// Many posts belong to one author (user)
+posts.authorId > users.id
+
+// Many-to-One: Users to Teams
+// Many users belong to one team
+users.id > teams.id
+
+// Many-to-One: Comments to Posts
+// Many comments belong to one post
+comments.postId > posts.id
+
+// Many-to-One: Comments to Users
+// Many comments belong to one user
+tags.userId > users.id
+
+// Many-to-Many: Posts to Tags (through post_tags)
+// Posts can have many tags, tags can belong to many posts
+post_tags.postId > posts.id
+post_tags.tagId > tags.id
+
+// Alternative entity-level syntax (defaults to id fields):
+// users > teams
+// This is equivalent to: users.id > teams.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+projects.teamId > teams.id
+milestones.projectId > projects.id
+attachments.postId > posts.id
+notifications.userId > users.id
+user_projects.userId > users.id
+user_projects.projectId > projects.id
+projects.id < posts.authorId
+comments.userId > users.id
