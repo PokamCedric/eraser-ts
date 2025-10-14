@@ -53,12 +53,13 @@ export class HierarchicalLayoutEngine {
   }
 
   /**
-   * Compute hierarchical layers using inverted algorithm
+   * Compute hierarchical layers using iterative algorithm (no recursion)
    *
    * Algorithm:
-   * - Roots (don't depend on anyone) → Layer max (right)
-   * - Leaves (depend on others) → Layer 0 (left)
+   * - Roots (don't depend on anyone) → Layer 0 (initial)
+   * - Leaves (depend on others) → Layer N (computed iteratively)
    * - Layer = max(layer of dependencies) + 1
+   * - Finally invert: roots → rightmost, leaves → leftmost
    */
   static computeLayers(
     dependencyGraph: DependencyGraph,
@@ -66,58 +67,90 @@ export class HierarchicalLayoutEngine {
   ): LayerResult {
     const { graph, nodes } = dependencyGraph;
     const layerOf = new Map<string, number>();
-    const visited = new Set<string>();
 
-    // Recursive function to compute layer for a node
-    const computeLayer = (node: string): number => {
-      // Already computed?
-      if (layerOf.has(node)) return layerOf.get(node)!;
-
-      // Cycle detection
-      if (visited.has(node)) {
-        layerOf.set(node, 0);
-        return 0;
+    // Step 1: Count incoming dependencies for each node
+    const inDegree = new Map<string, number>();
+    for (const node of nodes) {
+      inDegree.set(node, 0);
+    }
+    for (const [, dependencies] of graph.entries()) {
+      for (const dep of dependencies) {
+        if (nodes.has(dep)) {
+          inDegree.set(dep, (inDegree.get(dep) || 0) + 1);
+        }
       }
+    }
 
-      visited.add(node);
-
-      // Get all nodes that this node depends on
-      const dependencies = graph.get(node) || [];
-
-      if (dependencies.length === 0) {
-        // Root: doesn't depend on anyone - rightmost layer
+    // Step 2: Find all roots (nodes with no dependencies)
+    const queue: string[] = [];
+    for (const node of nodes) {
+      const deps = graph.get(node) || [];
+      if (deps.length === 0) {
         layerOf.set(node, 0);
-      } else {
-        // Layer = max(layer of dependencies) + 1
-        // This places nodes that depend on layer N at layer N+1
-        const maxDependencyLayer = Math.max(...dependencies.map(dep => computeLayer(dep)));
-        layerOf.set(node, maxDependencyLayer + 1);
+        queue.push(node);
       }
+    }
 
-      visited.delete(node);
-      return layerOf.get(node)!;
-    };
+    console.log('=== ITERATIVE LAYER COMPUTATION ===');
+    console.log(`Starting with ${queue.length} roots:`, queue.join(', '));
 
-    // Compute layers for all nodes
-    nodes.forEach(n => computeLayer(n));
+    // Step 3: Process nodes level by level (iterative topological sort)
+    let processed = 0;
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      processed++;
 
-    // Invert layers: nodes with highest layer should be rightmost
-    // Find max layer
+      // For each node that depends on this one
+      for (const [dependent, dependencies] of graph.entries()) {
+        if (!dependencies.includes(node)) continue;
+
+        // Check if all dependencies of 'dependent' have been processed
+        const allDepsProcessed = dependencies.every(dep => layerOf.has(dep));
+
+        if (allDepsProcessed) {
+          // Compute layer: max(layer of dependencies) + 1
+          const maxDepLayer = Math.max(...dependencies.map(dep => layerOf.get(dep)!));
+          const newLayer = maxDepLayer + 1;
+
+          // Only update if not yet computed or if we found a longer path
+          if (!layerOf.has(dependent) || newLayer > layerOf.get(dependent)!) {
+            layerOf.set(dependent, newLayer);
+
+            // Add to queue if not already processed
+            if (!queue.includes(dependent)) {
+              queue.push(dependent);
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`Processed ${processed} nodes`);
+
+    // Step 4: Handle cycles (nodes not processed)
+    for (const node of nodes) {
+      if (!layerOf.has(node)) {
+        console.log(`Warning: Node ${node} is part of a cycle, placing at layer 0`);
+        layerOf.set(node, 0);
+      }
+    }
+
+    // Step 5: Invert layers (roots → rightmost, leaves → leftmost)
     const maxLayer = Math.max(...Array.from(layerOf.values()));
+    console.log(`Max layer before inversion: ${maxLayer}`);
 
-    // Invert: layer N becomes (maxLayer - N)
     for (const [node, layer] of layerOf.entries()) {
       layerOf.set(node, maxLayer - layer);
     }
 
-    // Group nodes by layer
+    // Step 6: Group nodes by layer
     const layers = new Map<number, string[]>();
     for (const [node, layer] of layerOf.entries()) {
       if (!layers.has(layer)) layers.set(layer, []);
       layers.get(layer)!.push(node);
     }
 
-    // Handle isolated entities (no relationships)
+    // Step 7: Handle isolated entities (no relationships)
     entities.forEach(e => {
       if (!layerOf.has(e.name)) {
         const isolatedLayer = layers.size > 0 ? Math.max(...layers.keys()) + 1 : 0;
@@ -126,6 +159,12 @@ export class HierarchicalLayoutEngine {
         layers.get(isolatedLayer)!.push(e.name);
       }
     });
+
+    // Debug: Show initial layers before optimization
+    console.log('\n=== INITIAL LAYERS (before optimization) ===');
+    for (const [layer, nodes] of Array.from(layers.entries()).sort((a, b) => a[0] - b[0])) {
+      console.log(`Layer ${layer}: ${nodes.join(', ')}`);
+    }
 
     return { layers, layerOf };
   }

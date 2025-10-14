@@ -264,55 +264,79 @@ export class AppController {
   }
 
   private _getDefaultDSL(): string {
-    return `// Workspace Collaboration System
-// Based on ERD example with chat, users, teams, workspaces, folders, and invites
+    return `// Comprehensive Relationships Demo
+// This example demonstrates all relationship types and features
 
-users [icon: users, color: #3b82f6] {
-    id string @pk
-    teams string
-    displayName string
-    team_role string
+// Users entity
+users {
+    id uuid @pk
+    username string @unique @required
+    email string @unique @required
+    profileId uuid @fk
 }
 
-teams [icon: users, color: #8b5cf6] {
-    id string @pk
-    name string
+// Teams entity
+teams {
+    id uuid @pk
+    name string @required
+    description text
 }
 
-workspaces [icon: home, color: #10b981] {
-    id string @pk
-    name string
-    createdAt timestamp
-    folderId string @fk
-    teamId string @fk
+// Posts entity
+posts {
+    id uuid @pk
+    authorId uuid @fk @required
+    title string @required
+    content text
+    status string @enum(fields: [draft, published, archived])
 }
 
-folders [icon: folder, color: #f59e0b] {
-    id string @pk
-    name string
+roles [icon: shield, color: orange] {
+
+  id uuid pk
+  name string unique required
+  description text
+}
+permissions [icon: key, color: green] {
+
+  id uuid pk
+  name string unique required
+  description text
+}
+user_roles [icon: users, color: purple] {
+
+  id uuid pk
+  userId uuid required
+  roleId uuid required
+}
+role_permissions [icon: lock, color: teal] {
+
+  id uuid pk
+  roleId uuid required
+  permissionId uuid required
 }
 
-chat [icon: message-circle, color: #ec4899] {
-    id string @pk
-    duration number
-    startedAt timestamp
-    endedAt timestamp
-    workspaceId string @fk
-}
 
-invite [icon: mail, color: #06b6d4] {
-    inviteId string @pk
-    workspaceId string @fk
-    type string
-    inviterId string @fk
-}
+// ============================================
+// RELATIONSHIPS
+// ============================================
 
-// Relationships
-users.id <> teams.id
-workspaces.folderId > folders.id
-chat.workspaceId > workspaces.id
-invite.workspaceId > workspaces.id
-invite.inviterId > users.id
-workspaces.teamId > teams.id`;
+// Many-to-One: Posts to Users
+// Many posts belong to one author (user)
+posts.authorId > users.id
+
+// Many-to-One: Users to Teams
+// Many users belong to one team
+users.id > teams.id
+
+
+// Alternative entity-level syntax (defaults to id fields):
+// users > teams
+// This is equivalent to: users.id > teams.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+`;
   }
 }
