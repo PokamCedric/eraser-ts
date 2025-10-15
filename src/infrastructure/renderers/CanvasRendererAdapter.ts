@@ -9,9 +9,7 @@ import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
 import { HierarchicalLayoutEngine } from '../layout/HierarchicalLayoutEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
-import { VerticalAlignmentOptimizer } from '../layout/VerticalAlignmentOptimizer';
-import { FieldOrderingOptimizer } from '../layout/FieldOrderingOptimizer';
-import { ConnectionAlignedSpacing } from '../layout/ConnectionAlignedSpacing';
+import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
 import { getRelationshipCardinality } from '../../data/models/utils';
 
 interface MousePosition {
@@ -174,58 +172,36 @@ export class CanvasRendererAdapter implements IRenderer {
       this.entities
     );
 
-    // Step 3: Optimize vertical alignment to reduce edge crossings
-    // Prioritizes connections to Primary Keys (placed higher)
-    layers = VerticalAlignmentOptimizer.optimize(
-      layers,
+    // Step 3: Optimize ordering of entities within layers and fields within entities
+    // This determines the best vertical order to minimize edge crossings
+    const orderedLayers = MagneticAlignmentOptimizer.optimize(
+      this.entities,
       this.relationships,
-      this.entities,  // Pass entities to detect Primary Keys
-      4  // Number of optimization iterations
+      layers
     );
 
-    // Step 4: Position entities based on optimized layers
+    // Step 4: Calculate positions based on optimized ordering
     const positions = LayoutPositioner.calculatePositions(
-      layers,
+      orderedLayers,
       this.entities,  // Pass entities to calculate heights
       {
         entityWidth: this.entityWidth,
         entityHeaderHeight: this.entityHeaderHeight,
         entityFieldHeight: this.entityFieldHeight,
         horizontalSpacing: this.entityWidth + 120,
-        verticalSpacing: 30,  // Minimum gap between entities
+        verticalSpacing: 10,  // Minimum gap between entities
         baseX: 100,
         displayHeight: this.displayHeight
       }
     );
 
-    // Apply positions
+    // Apply final positions
     this.entityPositions = positions;
 
-    // Step 5: Optimize field ordering to minimize connection crossings
-    FieldOrderingOptimizer.optimizeFieldOrder(
-      this.entities,
-      this.relationships,
-      this.entityPositions,
-      this.entityHeaderHeight,
-      this.entityFieldHeight,
-      layers,
-      1  // Number of optimization iterations (reduced to preserve dispersion)
-    );
+    // Step 5: Debug output
+    this._logLayoutDebugInfo(orderedLayers);
 
-    // Step 6: Adjust Y spacing to align connections (minimize crossings)
-    ConnectionAlignedSpacing.optimizeSpacing(
-      this.entities,
-      this.relationships,
-      this.entityPositions,
-      layers,
-      this.entityHeaderHeight,
-      this.entityFieldHeight
-    );
-
-    // Step 7: Debug output
-    this._logLayoutDebugInfo(layers);
-
-    // Step 8: Fit to screen
+    // Step 6: Fit to screen
     this.fitToScreen();
   }
 
