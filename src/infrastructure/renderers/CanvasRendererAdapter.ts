@@ -10,6 +10,7 @@ import { Position } from '../../domain/value-objects/Position';
 import { HierarchicalLayoutEngine } from '../layout/HierarchicalLayoutEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
+import { FieldAlignmentOptimizer } from '../layout/FieldAlignmentOptimizer';
 import { getRelationshipCardinality } from '../../data/models/utils';
 
 interface MousePosition {
@@ -180,7 +181,7 @@ export class CanvasRendererAdapter implements IRenderer {
       layers
     );
 
-    // Step 4: Calculate positions based on optimized ordering
+    // Step 4: Calculate initial positions based on optimized ordering
     const positions = LayoutPositioner.calculatePositions(
       orderedLayers,
       this.entities,  // Pass entities to calculate heights
@@ -195,13 +196,23 @@ export class CanvasRendererAdapter implements IRenderer {
       }
     );
 
-    // Apply final positions
+    // Apply initial positions
     this.entityPositions = positions;
 
-    // Step 5: Debug output
+    // Step 5: Adjust Y positions to align connected fields (ERASER-style alignment)
+    FieldAlignmentOptimizer.optimize(
+      this.entities,
+      this.relationships,
+      this.entityPositions,
+      orderedLayers,
+      this.entityHeaderHeight,
+      this.entityFieldHeight
+    );
+
+    // Step 6: Debug output
     this._logLayoutDebugInfo(orderedLayers);
 
-    // Step 6: Fit to screen
+    // Step 7: Fit to screen
     this.fitToScreen();
   }
 
