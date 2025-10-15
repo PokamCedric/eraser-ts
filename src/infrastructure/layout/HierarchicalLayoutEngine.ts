@@ -55,6 +55,10 @@ export class HierarchicalLayoutEngine {
   /**
    * Compute hierarchical layers using iterative algorithm (no recursion)
    *
+   * @param dependencyGraph - The dependency graph
+   * @param entities - All entities
+   * @param debug - Enable debug logging (default: false)
+   *
    * Algorithm with Dynamic Distance Minimization
    * =============================================
    *
@@ -173,7 +177,8 @@ export class HierarchicalLayoutEngine {
    */
   static computeLayers(
     dependencyGraph: DependencyGraph,
-    entities: Entity[]
+    entities: Entity[],
+    debug: boolean = false
   ): LayerResult {
     const { graph, nodes } = dependencyGraph;
     const layerOf = new Map<string, number>();
@@ -201,21 +206,23 @@ export class HierarchicalLayoutEngine {
       }
     }
 
-    console.log('=== ITERATIVE LAYER COMPUTATION ===');
-    console.log(`Starting with ${queue.length} roots:`, queue.join(', '));
+    if (debug) {
+      console.log('=== ITERATIVE LAYER COMPUTATION ===');
+      console.log(`Starting with ${queue.length} roots:`, queue.join(', '));
+    }
 
     // Step 3: Process nodes level by level (iterative topological sort)
     let processed = 0;
     while (queue.length > 0) {
       const node = queue.shift()!;
       processed++;
-      console.log(`\nProcessing: ${node} (Layer ${layerOf.get(node)})`);
+      // console.log(`\nProcessing: ${node} (Layer ${layerOf.get(node)})`);
 
       // For each node that depends on this one
       for (const [dependent, dependencies] of graph.entries()) {
         if (!dependencies.includes(node)) continue;
 
-        console.log(`  Found dependent: ${dependent} (depends on: ${dependencies.join(', ')})`);
+        // console.log(`  Found dependent: ${dependent} (depends on: ${dependencies.join(', ')})`);
 
         // Check if all dependencies of 'dependent' have been processed
         const allDepsProcessed = dependencies.every(dep => layerOf.has(dep));
@@ -227,22 +234,22 @@ export class HierarchicalLayoutEngine {
           const minDepLayer = Math.min(...depLayers.map(d => d.layer));
           const newLayer = maxDepLayer + 1;
 
-          console.log(`    All dependencies processed. Dep layers:`, depLayers);
-          console.log(`    Max dependency layer: ${maxDepLayer}, Min: ${minDepLayer}, new layer: ${newLayer}`);
+          // console.log(`    All dependencies processed. Dep layers:`, depLayers);
+          // console.log(`    Max dependency layer: ${maxDepLayer}, Min: ${minDepLayer}, new layer: ${newLayer}`);
 
           // Check if we can reduce distance by moving lower dependencies up
           if (maxDepLayer - minDepLayer > 0) {
-            console.log(`    Distance between dependencies: ${maxDepLayer - minDepLayer}`);
+            // console.log(`    Distance between dependencies: ${maxDepLayer - minDepLayer}`);
 
             // Try to move lower dependencies closer to maxDepLayer
             for (const { dep: depName, layer: depLayer } of depLayers) {
               if (depLayer < maxDepLayer) {
                 const targetDepLayer = maxDepLayer; // Try to align with max
-                console.log(`    Checking if ${depName} can move from L${depLayer} to L${targetDepLayer}`);
+                // console.log(`    Checking if ${depName} can move from L${depLayer} to L${targetDepLayer}`);
 
                 // Check if this dependency can be moved without violating constraints
                 if (this._canMoveNodeToLayer(depName, targetDepLayer, graph, layerOf)) {
-                  console.log(`    ✓ Moving ${depName}: L${depLayer} → L${targetDepLayer} to reduce distance`);
+                  // console.log(`    ✓ Moving ${depName}: L${depLayer} → L${targetDepLayer} to reduce distance`);
                   layerOf.set(depName, targetDepLayer);
 
                   // Need to reprocess nodes that depend on this moved node
@@ -252,7 +259,7 @@ export class HierarchicalLayoutEngine {
                     }
                   }
                 } else {
-                  console.log(`    ✗ Cannot move ${depName} to L${targetDepLayer}`);
+                  // console.log(`    ✗ Cannot move ${depName} to L${targetDepLayer}`);
                 }
               }
             }
@@ -262,55 +269,55 @@ export class HierarchicalLayoutEngine {
             const updatedNewLayer = updatedMaxDepLayer + 1;
 
             if (updatedNewLayer !== newLayer) {
-              console.log(`    After dependency adjustments: new layer ${newLayer} → ${updatedNewLayer}`);
+              // console.log(`    After dependency adjustments: new layer ${newLayer} → ${updatedNewLayer}`);
             }
 
             // Set the dependent's layer
             const currentLayer = layerOf.get(dependent);
             if (!currentLayer || updatedNewLayer > currentLayer) {
-              console.log(`    ${currentLayer ? `Updating ${dependent}: L${currentLayer} → L${updatedNewLayer}` : `Setting ${dependent}: L${updatedNewLayer}`}`);
+              // console.log(`    ${currentLayer ? `Updating ${dependent}: L${currentLayer} → L${updatedNewLayer}` : `Setting ${dependent}: L${updatedNewLayer}`}`);
               layerOf.set(dependent, updatedNewLayer);
 
               if (!queue.includes(dependent)) {
                 queue.push(dependent);
               }
             } else {
-              console.log(`    Keeping ${dependent} at L${currentLayer} (new would be L${updatedNewLayer})`);
+              // console.log(`    Keeping ${dependent} at L${currentLayer} (new would be L${updatedNewLayer})`);
             }
           } else {
             // No distance to reduce, proceed normally
             const currentLayer = layerOf.get(dependent);
             if (!currentLayer || newLayer > currentLayer) {
-              console.log(`    ${currentLayer ? `Updating ${dependent}: L${currentLayer} → L${newLayer}` : `Setting ${dependent}: L${newLayer}`}`);
+              // console.log(`    ${currentLayer ? `Updating ${dependent}: L${currentLayer} → L${newLayer}` : `Setting ${dependent}: L${newLayer}`}`);
               layerOf.set(dependent, newLayer);
 
               if (!queue.includes(dependent)) {
                 queue.push(dependent);
               }
             } else {
-              console.log(`    Keeping ${dependent} at L${currentLayer} (new would be L${newLayer})`);
+              // console.log(`    Keeping ${dependent} at L${currentLayer} (new would be L${newLayer})`);
             }
           }
         } else {
-          const missingDeps = dependencies.filter(dep => !layerOf.has(dep));
-          console.log(`    Not all dependencies processed yet. Missing: ${missingDeps.join(', ')}`);
+          // const missingDeps = dependencies.filter(dep => !layerOf.has(dep));
+          // console.log(`    Not all dependencies processed yet. Missing: ${missingDeps.join(', ')}`);
         }
       }
     }
 
-    console.log(`\nProcessed ${processed} nodes`);
+    // console.log(`\nProcessed ${processed} nodes`);
 
     // Step 4: Handle cycles (nodes not processed)
     for (const node of nodes) {
       if (!layerOf.has(node)) {
-        console.log(`Warning: Node ${node} is part of a cycle, placing at layer 0`);
+        // console.log(`Warning: Node ${node} is part of a cycle, placing at layer 0`);
         layerOf.set(node, 0);
       }
     }
 
     // Step 5: Invert layers (roots → rightmost, leaves → leftmost)
     const maxLayer = Math.max(...Array.from(layerOf.values()));
-    console.log(`Max layer before inversion: ${maxLayer}`);
+    // console.log(`Max layer before inversion: ${maxLayer}`);
 
     for (const [node, layer] of layerOf.entries()) {
       layerOf.set(node, maxLayer - layer);
@@ -334,9 +341,11 @@ export class HierarchicalLayoutEngine {
     });
 
     // Debug: Show initial layers before optimization
-    console.log('\n=== INITIAL LAYERS (before optimization) ===');
-    for (const [layer, nodes] of Array.from(layers.entries()).sort((a, b) => a[0] - b[0])) {
-      console.log(`Layer ${layer}: ${nodes.join(', ')}`);
+    if (debug) {
+      console.log('\n=== INITIAL LAYERS (before optimization) ===');
+      for (const [layer, nodes] of Array.from(layers.entries()).sort((a, b) => a[0] - b[0])) {
+        console.log(`Layer ${layer}: ${nodes.join(', ')}`);
+      }
     }
 
     return { layers, layerOf };
