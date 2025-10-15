@@ -10,7 +10,8 @@ import { Position } from '../../domain/value-objects/Position';
 import { HierarchicalLayoutEngine } from '../layout/HierarchicalLayoutEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
-import { FieldAlignmentOptimizer } from '../layout/FieldAlignmentOptimizer';
+import { AnchorBasedOrdering } from '../layout/AnchorBasedOrdering';
+import { CrossingMinimizer } from '../layout/CrossingMinimizer';
 import { getRelationshipCardinality } from '../../data/models/utils';
 
 interface MousePosition {
@@ -173,17 +174,32 @@ export class CanvasRendererAdapter implements IRenderer {
       this.entities
     );
 
-    // Step 3: Optimize ordering of entities within layers and fields within entities
-    // This determines the best vertical order to minimize edge crossings
+    // Step 3: Basic ordering (field ordering within entities)
     const orderedLayers = MagneticAlignmentOptimizer.optimize(
       this.entities,
       this.relationships,
       layers
     );
 
-    // Step 4: Calculate initial positions based on optimized ordering
-    const positions = LayoutPositioner.calculatePositions(
+    // Step 4: ANCHOR-BASED ORDERING - ERASER-style approach
+    // Find the most connected entity in central layer and center it
+    // Then center entities connected to it in adjacent layers
+    const anchorLayers = AnchorBasedOrdering.optimize(
       orderedLayers,
+      this.relationships
+    );
+
+    // Step 5: Minimize crossings (optional refinement)
+    const minimizedLayers = CrossingMinimizer.optimize(
+      anchorLayers,
+      this.relationships,
+      this.entities,
+      3 // limited iterations
+    );
+
+    // Step 6: Calculate positions based on optimized ordering
+    const positions = LayoutPositioner.calculatePositions(
+      minimizedLayers,
       this.entities,  // Pass entities to calculate heights
       {
         entityWidth: this.entityWidth,
@@ -196,23 +212,13 @@ export class CanvasRendererAdapter implements IRenderer {
       }
     );
 
-    // Apply initial positions
+    // Apply positions
     this.entityPositions = positions;
 
-    // Step 5: Adjust Y positions to align connected fields (ERASER-style alignment)
-    FieldAlignmentOptimizer.optimize(
-      this.entities,
-      this.relationships,
-      this.entityPositions,
-      orderedLayers,
-      this.entityHeaderHeight,
-      this.entityFieldHeight
-    );
+    // Step 7: Debug output
+    this._logLayoutDebugInfo(minimizedLayers);
 
-    // Step 6: Debug output
-    this._logLayoutDebugInfo(orderedLayers);
-
-    // Step 7: Fit to screen
+    // Step 8: Fit to screen
     this.fitToScreen();
   }
 
