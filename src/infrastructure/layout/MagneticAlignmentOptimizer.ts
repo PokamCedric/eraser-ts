@@ -11,7 +11,7 @@
 
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
-import { VerticalOrderingAlgorithm } from './VerticalOrderingAlgorithm';
+// import { VerticalOrderingAlgorithm } from './VerticalOrderingAlgorithm';
 import { FieldOrderingAlgorithm } from './FieldOrderingAlgorithm';
 
 export class MagneticAlignmentOptimizer {
@@ -28,18 +28,16 @@ export class MagneticAlignmentOptimizer {
     relationships: Relationship[],
     layers: Map<number, string[]>
   ): Map<number, string[]> {
-    console.log('\n=== MAGNETIC ALIGNMENT OPTIMIZER ===');
-    console.log('Coordinating layout optimization algorithms...\n');
+    console.log('\n=== FIELD ORDERING OPTIMIZER ===');
+    console.log('Optimizing field order within entities...\n');
 
-    // Step 1: Optimize vertical ordering of entities within layers
-    // This determines the relative Y position of entities
-    const orderedLayers = VerticalOrderingAlgorithm.optimize(layers, relationships);
+    // NOTE: Vertical ordering of entities is now done by ClusterBasedOrdering
+    // This optimizer now ONLY handles field ordering within entities
 
-    // Step 2: Optimize field ordering within entities
-    // This is done AFTER entity ordering so fields can use entity positions
-    FieldOrderingAlgorithm.optimize(entities, relationships, orderedLayers);
+    // Optimize field ordering within entities
+    FieldOrderingAlgorithm.optimize(entities, relationships, layers);
 
-    console.log('=== ALL OPTIMIZATIONS COMPLETE ===\n');
-    return orderedLayers;
+    console.log('=== FIELD ORDERING COMPLETE ===\n');
+    return layers;
   }
 }

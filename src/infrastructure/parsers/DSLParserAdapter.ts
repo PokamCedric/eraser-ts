@@ -217,11 +217,11 @@ export class DSLParserAdapter implements IDiagramRepository {
 
     if (!match) return null;
 
-    const fromEntity = match[1];
-    const fromField = match[2] || 'id';
+    let fromEntity = match[1];
+    let fromField = match[2] || 'id';
     const connector = match[3];
-    const toEntity = match[4];
-    const toField = match[5] || 'id';
+    let toEntity = match[4];
+    let toField = match[5] || 'id';
     const metadataStr = match[6] || '';
 
     // Determine relationship type based on connector
@@ -241,6 +241,20 @@ export class DSLParserAdapter implements IDiagramRepository {
         break;
       default:
         type = 'many-to-one';
+    }
+
+    // IMPORTANT: Eraser semantics interpretation
+    // "A.x > B.y" means "A.x references B.y" (A depends on B)
+    // But "A.id > B.x" means "A.id is referenced by B.x" (B depends on A)
+    // We need to swap direction when the left side is an 'id' field being referenced
+    if (fromField === 'id' && toField !== 'id' && (connector === '>' || connector === '<')) {
+      // Swap from and to
+      [fromEntity, toEntity] = [toEntity, fromEntity];
+      [fromField, toField] = [toField, fromField];
+
+      // Also flip the type
+      if (type === 'many-to-one') type = 'one-to-many';
+      else if (type === 'one-to-many') type = 'many-to-one';
     }
 
     // Parse metadata (color, label, etc.)

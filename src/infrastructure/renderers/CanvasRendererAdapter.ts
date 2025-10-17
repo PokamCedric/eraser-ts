@@ -7,11 +7,10 @@ import { IRenderer } from '../../domain/repositories/IRenderer';
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
-import { HierarchicalLayoutEngine } from '../layout/HierarchicalLayoutEngine';
+import { ConnectionBasedLayoutEngine } from '../layout/ConnectionBasedLayoutEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
-import { AnchorBasedOrdering } from '../layout/AnchorBasedOrdering';
-import { CrossingMinimizer } from '../layout/CrossingMinimizer';
+import { ClusterBasedOrdering } from '../layout/ClusterBasedOrdering';
 import { getRelationshipCardinality } from '../../data/models/utils';
 
 interface MousePosition {
@@ -162,44 +161,28 @@ export class CanvasRendererAdapter implements IRenderer {
   autoLayout(): void {
     this.entityPositions.clear();
 
-    // Step 1: Build dependency graph
-    const dependencyGraph = HierarchicalLayoutEngine.buildDependencyGraph(
-      this.entities,
+    // Step 1 & 2: Compute hierarchical layers using connection-based algorithm
+    // This respects Rules 1, 2, and 3
+    let { layers } = ConnectionBasedLayoutEngine.layout(this.entities, this.relationships);
+
+    // Step 3: CLUSTER-BASED Y-ORDERING
+    // Groups entities by shared connections, identifies pivots,
+    // and orders by eccentricity (distance to furthest connection)
+    const orderedLayers = ClusterBasedOrdering.optimize(
+      layers,
       this.relationships
     );
 
-    // Step 2: Compute hierarchical layers
-    let { layers } = HierarchicalLayoutEngine.computeLayers(
-      dependencyGraph,
-      this.entities
-    );
-
-    // Step 3: Basic ordering (field ordering within entities)
-    const orderedLayers = MagneticAlignmentOptimizer.optimize(
+    // Step 4: Field ordering within entities (only reorder fields, not entities)
+    const finalLayers = MagneticAlignmentOptimizer.optimize(
       this.entities,
       this.relationships,
-      layers
+      orderedLayers
     );
 
-    // Step 4: ANCHOR-BASED ORDERING - ERASER-style approach
-    // Find the most connected entity in central layer and center it
-    // Then center entities connected to it in adjacent layers
-    const anchorLayers = AnchorBasedOrdering.optimize(
-      orderedLayers,
-      this.relationships
-    );
-
-    // Step 5: Minimize crossings (optional refinement)
-    const minimizedLayers = CrossingMinimizer.optimize(
-      anchorLayers,
-      this.relationships,
-      this.entities,
-      3 // limited iterations
-    );
-
-    // Step 6: Calculate positions based on optimized ordering
+    // Step 5: Calculate positions based on optimized ordering
     const positions = LayoutPositioner.calculatePositions(
-      minimizedLayers,
+      finalLayers,
       this.entities,  // Pass entities to calculate heights
       {
         entityWidth: this.entityWidth,
@@ -215,10 +198,10 @@ export class CanvasRendererAdapter implements IRenderer {
     // Apply positions
     this.entityPositions = positions;
 
-    // Step 7: Debug output
-    this._logLayoutDebugInfo(minimizedLayers);
+    // Step 6: Debug output
+    this._logLayoutDebugInfo(finalLayers);
 
-    // Step 8: Fit to screen
+    // Step 7: Fit to screen
     this.fitToScreen();
   }
 

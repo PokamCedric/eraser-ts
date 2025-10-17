@@ -344,7 +344,7 @@ export class ClusterBasedOrdering {
     chain: string[],
     anchorCluster: Cluster,
     connections: Map<string, Array<{from: string, to: string}>>,
-    clustersByLayer: Map<number, Cluster[]>,
+    _clustersByLayer: Map<number, Cluster[]>,
     layerIndices: number[],
     clustersInChains: Set<string>
   ): void {
@@ -387,7 +387,7 @@ export class ClusterBasedOrdering {
     chain: string[],
     anchorCluster: Cluster,
     connections: Map<string, Array<{from: string, to: string}>>,
-    clustersByLayer: Map<number, Cluster[]>,
+    _clustersByLayer: Map<number, Cluster[]>,
     layerIndices: number[],
     clustersInChains: Set<string>
   ): void {
