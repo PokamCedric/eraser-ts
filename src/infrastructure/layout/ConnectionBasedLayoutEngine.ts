@@ -20,11 +20,13 @@
  *   - Rule 1: Connected entities cannot cohabit same layer
  *   - Rule 2: Minimum distance = 1 (check for conflicts, increment/decrement if needed)
  *   - Rule 3: Respect direction (left → right)
+ *   - Rule 3.1: Direction rule complexe (linear chain) - if left > right, move right after left
+ *   - Rule 3.2: Cycle detection (triangle) - keep default order or reorder based on flag
  *   - Normalize: If negative layers, shift all layers to make minimum = 0
  *
  * CONFLICTS (bidirectional):
  *   Case 1: A > B and B < A (same relationship written twice)
- *   Case 2: A > B, B > C, C > A (circular dependency - cannot be resolved)
+ *   Case 2: A > B, B > C, C > A (circular dependency - detected as cycle)
  */
 
 import { Entity } from '../../domain/entities/Entity';
@@ -41,6 +43,9 @@ export interface ConnectionLayerResult {
 }
 
 export class ConnectionBasedLayoutEngine {
+  // Flag to choose behavior on cycle detection (Rule 3.2)
+  // true = reorder anyway, false = keep default order
+  private static PREFER_REORDER_ON_CYCLE = false;
   /**
    * STEP 1: Parse relationships and apply position rule (direction rule)
    *
@@ -58,12 +63,14 @@ export class ConnectionBasedLayoutEngine {
   private static parseRelationships(relationships: Relationship[]): DirectedRelation[] {
     const relations: DirectedRelation[] = [];
 
+    console.log('\n=== ÉTAPE 1 : RELATIONS DÉTECTÉES ===');
     for (const rel of relationships) {
       // Position rule: first written is left, second is right
       const left = rel.from.entity;
       const right = rel.to.entity;
 
       relations.push({ left, right });
+      console.log(`${left} -> ${right}`);
     }
 
     return relations;
@@ -109,11 +116,14 @@ export class ConnectionBasedLayoutEngine {
       }
     };
 
+    console.log('\n=== ÉTAPE 2 : ORDRE FINAL DES RELATIONS ===');
     while (remaining.length > 0) {
       const nextRel = findNextRelation();
       orderedRelations.push(nextRel);
       processedEntities.add(nextRel.left);
       processedEntities.add(nextRel.right);
+
+      console.log(`${nextRel.left} -> ${nextRel.right}`);
 
       // Remove from remaining
       const idx = remaining.indexOf(nextRel);
@@ -131,7 +141,16 @@ export class ConnectionBasedLayoutEngine {
   private static buildLayers(orderedRelations: DirectedRelation[]): Map<string, number> {
     const entityLayer = new Map<string, number>();
 
-    // Build connection graph to check conflicts
+    // Build DIRECTED graph for cycle detection
+    const directedGraph = new Map<string, Set<string>>();
+    for (const rel of orderedRelations) {
+      if (!directedGraph.has(rel.left)) {
+        directedGraph.set(rel.left, new Set());
+      }
+      directedGraph.get(rel.left)!.add(rel.right);
+    }
+
+    // Build connection graph (undirected) to check conflicts
     const connectionsGraph = new Map<string, Set<string>>();
     for (const rel of orderedRelations) {
       if (!connectionsGraph.has(rel.left)) {
@@ -143,6 +162,26 @@ export class ConnectionBasedLayoutEngine {
       connectionsGraph.get(rel.left)!.add(rel.right);
       connectionsGraph.get(rel.right)!.add(rel.left);
     }
+
+    // Helper: Detect cycle between left and right
+    const hasCycleBetween = (left: string, right: string): boolean => {
+      const visited = new Set<string>();
+
+      const dfs = (node: string, target: string): boolean => {
+        if (node === target) return true;
+        if (visited.has(node)) return false;
+        visited.add(node);
+
+        const neighbors = directedGraph.get(node) || new Set();
+        for (const neighbor of neighbors) {
+          if (dfs(neighbor, target)) return true;
+        }
+        return false;
+      };
+
+      // Check if right can reach left (cycle exists)
+      return dfs(right, left);
+    };
 
     // Helper: Find valid layer without conflicts
     const findValidLayer = (
@@ -180,6 +219,24 @@ export class ConnectionBasedLayoutEngine {
       }
     };
 
+    // Helper: Format layers for logging
+    const formatLayers = (): string => {
+      const layers = new Map<number, string[]>();
+      entityLayer.forEach((layer, entity) => {
+        if (!layers.has(layer)) {
+          layers.set(layer, []);
+        }
+        layers.get(layer)!.push(entity);
+      });
+
+      const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
+      return sortedLayers
+        .map(layer => `Layer ${layer} [${layers.get(layer)!.sort().join(', ')}]`)
+        .join(' + ');
+    };
+
+    console.log('\n=== ÉTAPE 3 : LAYERS ===');
+
     // Process each relation
     for (const rel of orderedRelations) {
       const leftExists = entityLayer.has(rel.left);
@@ -206,20 +263,37 @@ export class ConnectionBasedLayoutEngine {
         const validLayer = findValidLayer(rel.right, targetLayer, 'right');
         entityLayer.set(rel.right, validLayer);
       } else {
-        // Case 4: Both exist - ensure left < right
+        // Case 4: Both exist
         const leftLayer = entityLayer.get(rel.left)!;
         const rightLayer = entityLayer.get(rel.right)!;
 
-        if (leftLayer >= rightLayer) {
-          // Violation: shift right and everything after it
-          const shiftAmount = leftLayer + 1 - rightLayer;
-          entityLayer.forEach((layer, entity) => {
-            if (layer >= rightLayer) {
-              entityLayer.set(entity, layer + shiftAmount);
+        if (leftLayer > rightLayer) {
+          // Detect if it's a cycle (Rule 3.2) or linear chain (Rule 3.1)
+          const isCycle = hasCycleBetween(rel.left, rel.right);
+
+          if (isCycle) {
+            // Rule 3.2: Cycle detected (triangle)
+            console.log(`  [CYCLE DÉTECTÉ] ${rel.left} -> ${rel.right} (${this.PREFER_REORDER_ON_CYCLE ? 'réordonner' : 'garder ordre par défaut'})`);
+            if (this.PREFER_REORDER_ON_CYCLE) {
+              // Option: reorder anyway
+              const targetLayer = leftLayer + 1;
+              const validLayer = findValidLayer(rel.right, targetLayer, 'right');
+              entityLayer.set(rel.right, validLayer);
             }
-          });
+            // Otherwise: keep default order (do nothing)
+          } else {
+            // Rule 3.1: Linear chain - apply correction
+            console.log(`  [CHAÎNE LINÉAIRE] ${rel.left} -> ${rel.right} (déplacer ${rel.right})`);
+            const targetLayer = leftLayer + 1;
+            const validLayer = findValidLayer(rel.right, targetLayer, 'right');
+            entityLayer.set(rel.right, validLayer);
+          }
         }
+        // Otherwise: order is correct
       }
+
+      // Log after each iteration
+      console.log(`- ${rel.left} -> ${rel.right} -> ${formatLayers()}`);
     }
 
     return entityLayer;

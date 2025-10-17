@@ -15,12 +15,13 @@ import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
 
-interface FieldYPosition {
-  entityName: string;
-  fieldName: string;
-  fieldIndex: number;
-  absoluteY: number; // Current absolute Y position of field center
-}
+// Unused interface - kept for potential future use
+// interface FieldYPosition {
+//   entityName: string;
+//   fieldName: string;
+//   fieldIndex: number;
+//   absoluteY: number; // Current absolute Y position of field center
+// }
 
 interface EntityAdjustment {
   entityName: string;

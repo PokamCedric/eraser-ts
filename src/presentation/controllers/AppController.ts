@@ -264,79 +264,164 @@ export class AppController {
   }
 
   private _getDefaultDSL(): string {
-    return `// Comprehensive Relationships Demo
-// This example demonstrates all relationship types and features
-
-// Users entity
-users {
-    id uuid @pk
-    username string @unique @required
-    email string @unique @required
-    profileId uuid @fk
+    return `users [icon: user, color: blue] {
+  id string pk
+  displayName string
+  team_role string
+  teams string
+  email string
+  phone string
+  addressId string
+  createdAt timestamp
+  updatedAt timestamp
 }
 
-// Teams entity
-teams {
-    id uuid @pk
-    name string @required
-    description text
+teams [icon: users, color: blue] {
+  id string pk
+  name string
+  createdAt timestamp
+  updatedAt timestamp
 }
 
-// Posts entity
-posts {
-    id uuid @pk
-    authorId uuid @fk @required
-    title string @required
-    content text
-    status string @enum(fields: [draft, published, archived])
+workspaces [icon: home] {
+  id string
+  createdAt timestamp
+  folderId string
+  teamId string
+  name string
+  description string
 }
 
-roles [icon: shield, color: orange] {
-
-  id uuid pk
-  name string unique required
-  description text
-}
-permissions [icon: key, color: green] {
-
-  id uuid pk
-  name string unique required
-  description text
-}
-user_roles [icon: users, color: purple] {
-
-  id uuid pk
-  userId uuid required
-  roleId uuid required
-}
-role_permissions [icon: lock, color: teal] {
-
-  id uuid pk
-  roleId uuid required
-  permissionId uuid required
+folders [icon: folder] {
+  id string
+  name string
 }
 
+chat [icon: message-circle, color: green] {
+  workspaceId string
+  duration number
+  startedAt timestamp
+  endedAt timestamp
+}
 
-// ============================================
-// RELATIONSHIPS
-// ============================================
+invite [icon: mail, color: green] {
+  workspaceId string
+  inviteId string
+  type string
+  inviterId string
+}
+products [icon: box, color: orange] {
 
-// Many-to-One: Posts to Users
-// Many posts belong to one author (user)
-posts.authorId > users.id
+  id string pk
+  name string
+  description string
+  price number
+  stock number
+  categoryId string
+  createdAt timestamp
+  updatedAt timestamp
+}
+categories [icon: tag, color: orange] {
 
-// Many-to-One: Users to Teams
-// Many users belong to one team
-users.id > teams.id
+  id string pk
+  name string
+  description string
+  parentCategoryId string
+}
+orders [icon: shopping-cart, color: purple] {
 
+  id string pk
+  userId string
+  status string
+  total number
+  paymentId string
+  shipmentId string
+  createdAt timestamp
+  updatedAt timestamp
+}
+order_items [icon: package, color: purple] {
 
-// Alternative entity-level syntax (defaults to id fields):
-// users > teams
-// This is equivalent to: users.id > teams.id
-user_roles.userId > users.id
-user_roles.roleId > roles.id
-role_permissions.roleId > roles.id
-role_permissions.permissionId > permissions.id
-`;
+  id string pk
+  orderId string
+  productId string
+  quantity number
+  price number
+}
+payments [icon: credit-card, color: purple] {
+
+  id string pk
+  orderId string
+  userId string
+  amount number
+  method string
+  status string
+  paidAt timestamp
+}
+reviews [icon: star, color: yellow] {
+
+  id string pk
+  userId string
+  productId string
+  rating number
+  comment string
+  createdAt timestamp
+}
+carts [icon: shopping-bag, color: teal] {
+
+  id string pk
+  userId string
+  createdAt timestamp
+}
+cart_items [icon: package, color: teal] {
+
+  id string pk
+  cartId string
+  productId string
+  quantity number
+}
+shipments [icon: truck, color: red] {
+
+  id string pk
+  orderId string
+  addressId string
+  status string
+  shippedAt timestamp
+  deliveredAt timestamp
+}
+addresses [icon: map-pin, color: blue] {
+
+  id string pk
+  userId string
+  line1 string
+  line2 string
+  city string
+  state string
+  postalCode string
+  country string
+  createdAt timestamp
+}
+
+users.teams <> teams.id
+workspaces.folderId > folders.id
+workspaces.teamId > teams.id
+chat.workspaceId > workspaces.id
+invite.workspaceId > workspaces.id
+invite.inviterId > users.id
+users.id > orders.userId
+orders.id > order_items.orderId
+order_items.productId > products.id
+products.categoryId > categories.id
+users.id > reviews.userId
+products.id > reviews.productId
+orders.paymentId > payments.id
+payments.userId > users.id
+orders.shipmentId > shipments.id
+shipments.addressId > addresses.id
+users.id > carts.userId
+carts.id > cart_items.cartId
+cart_items.productId > products.id
+users.id > addresses.userId
+orders.id > shipments.orderId
+users.addressId > addresses.id`;
   }
 }

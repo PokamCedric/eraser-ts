@@ -12,10 +12,11 @@
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 
-interface EdgeCrossing {
-  edge1: { from: string; to: string };
-  edge2: { from: string; to: string };
-}
+// Unused interface - kept for potential future use
+// interface EdgeCrossing {
+//   edge1: { from: string; to: string };
+//   edge2: { from: string; to: string };
+// }
 
 export class CrossingMinimizer {
   /**
