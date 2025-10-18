@@ -264,164 +264,173 @@ export class AppController {
   }
 
   private _getDefaultDSL(): string {
-    return `users [icon: user, color: blue] {
-  id string pk
-  displayName string
-  team_role string
-  teams string
-  email string
-  phone string
-  addressId string
+    return `
+// Comprehensive Relationships Demo
+// This example demonstrates all relationship types and features
+
+// Users entity
+users {
+    id uuid @pk
+    username string @unique @required
+    email string @unique @required
+    profileId uuid @fk
+}
+
+// Profiles entity (one-to-one with users)
+profiles {
+    id uuid @pk
+    userId uuid @fk @unique
+    bio text
+    avatar string
+}
+
+// Teams entity
+teams {
+    id uuid @pk
+    name string @required
+    description text
+}
+
+// Posts entity
+posts {
+    id uuid @pk
+    authorId uuid @fk @required
+    title string @required
+    content text
+    status string @enum(fields: [draft, published, archived])
+}
+
+// Comments entity
+comments {
+    id uuid @pk
+    postId uuid @fk @required
+    text text @required
+    createdAt timestamp @default(now)
+  userId uuid required
+}
+
+// Tags entity (for many-to-many with posts)
+tags {
+    id uuid @pk
+    userId uuid @fk @required
+    name string @unique @required
+}
+
+// Post-Tags junction table (many-to-many)
+post_tags {
+    id uuid @pk
+    postId uuid @fk @required
+    tagId uuid @fk @required
+}
+roles [icon: shield, color: orange] {
+
+  id uuid pk
+  name string unique required
+  description text
+}
+permissions [icon: key, color: green] {
+
+  id uuid pk
+  name string unique required
+  description text
+}
+user_roles [icon: users, color: purple] {
+
+  id uuid pk
+  userId uuid required
+  roleId uuid required
+}
+role_permissions [icon: lock, color: teal] {
+
+  id uuid pk
+  roleId uuid required
+  permissionId uuid required
+}
+projects [icon: folder, color: blue] {
+
+  id uuid pk
+  name string required
+  description text
+  teamId uuid required
   createdAt timestamp
-  updatedAt timestamp
 }
+milestones [icon: flag, color: yellow] {
 
-teams [icon: users, color: blue] {
-  id string pk
-  name string
-  createdAt timestamp
-  updatedAt timestamp
-}
-
-workspaces [icon: home] {
-  id string
-  createdAt timestamp
-  folderId string
-  teamId string
-  name string
-  description string
-}
-
-folders [icon: folder] {
-  id string
-  name string
-}
-
-chat [icon: message-circle, color: green] {
-  workspaceId string
-  duration number
-  startedAt timestamp
-  endedAt timestamp
-}
-
-invite [icon: mail, color: green] {
-  workspaceId string
-  inviteId string
-  type string
-  inviterId string
-}
-products [icon: box, color: orange] {
-
-  id string pk
-  name string
-  description string
-  price number
-  stock number
-  categoryId string
-  createdAt timestamp
-  updatedAt timestamp
-}
-categories [icon: tag, color: orange] {
-
-  id string pk
-  name string
-  description string
-  parentCategoryId string
-}
-orders [icon: shopping-cart, color: purple] {
-
-  id string pk
-  userId string
+  id uuid pk
+  projectId uuid required
+  name string required
+  dueDate date
   status string
-  total number
-  paymentId string
-  shipmentId string
-  createdAt timestamp
-  updatedAt timestamp
 }
-order_items [icon: package, color: purple] {
+attachments [icon: paperclip, color: gray] {
 
-  id string pk
-  orderId string
-  productId string
-  quantity number
-  price number
+  id uuid pk
+  postId uuid required
+  filename string required
+  url string required
+  uploadedAt timestamp
 }
-payments [icon: credit-card, color: purple] {
+notifications [icon: bell, color: red] {
 
-  id string pk
-  orderId string
-  userId string
-  amount number
-  method string
-  status string
-  paidAt timestamp
-}
-reviews [icon: star, color: yellow] {
-
-  id string pk
-  userId string
-  productId string
-  rating number
-  comment string
+  id uuid pk
+  userId uuid required
+  message string required
+  read boolean
   createdAt timestamp
 }
-carts [icon: shopping-bag, color: teal] {
+user_projects [icon: users, color: pink] {
 
-  id string pk
-  userId string
-  createdAt timestamp
-}
-cart_items [icon: package, color: teal] {
-
-  id string pk
-  cartId string
-  productId string
-  quantity number
-}
-shipments [icon: truck, color: red] {
-
-  id string pk
-  orderId string
-  addressId string
-  status string
-  shippedAt timestamp
-  deliveredAt timestamp
-}
-addresses [icon: map-pin, color: blue] {
-
-  id string pk
-  userId string
-  line1 string
-  line2 string
-  city string
-  state string
-  postalCode string
-  country string
-  createdAt timestamp
+  id uuid pk
+  userId uuid required
+  projectId uuid required
 }
 
-users.teams <> teams.id
-workspaces.folderId > folders.id
-workspaces.teamId > teams.id
-chat.workspaceId > workspaces.id
-invite.workspaceId > workspaces.id
-invite.inviterId > users.id
-users.id > orders.userId
-orders.id > order_items.orderId
-order_items.productId > products.id
-products.categoryId > categories.id
-users.id > reviews.userId
-products.id > reviews.productId
-orders.paymentId > payments.id
-payments.userId > users.id
-orders.shipmentId > shipments.id
-shipments.addressId > addresses.id
-users.id > carts.userId
-carts.id > cart_items.cartId
-cart_items.productId > products.id
-users.id > addresses.userId
-orders.id > shipments.orderId
-users.addressId > addresses.id`;
+
+// ============================================
+// RELATIONSHIPS
+// ============================================
+
+// One-to-One: Users to Profiles
+// Each user has exactly one profile
+users.profileId - profiles.id
+
+// Many-to-One: Posts to Users
+// Many posts belong to one author (user)
+posts.authorId > users.id
+
+// Many-to-One: Users to Teams
+// Many users belong to one team
+users.id > teams.id
+
+// Many-to-One: Comments to Posts
+// Many comments belong to one post
+comments.postId > posts.id
+
+// Many-to-One: Comments to Users
+// Many comments belong to one user
+tags.userId > users.id
+
+// Many-to-Many: Posts to Tags (through post_tags)
+// Posts can have many tags, tags can belong to many posts
+post_tags.postId > posts.id
+post_tags.tagId > tags.id
+
+// Alternative entity-level syntax (defaults to id fields):
+// users > teams
+// This is equivalent to: users.id > teams.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+projects.teamId > teams.id
+milestones.projectId > projects.id
+attachments.postId > posts.id
+notifications.userId > roles.id
+user_projects.userId > users.id
+user_projects.projectId > projects.id
+projects.id < posts.authorId
+comments.userId > users.id
+
+    `;
   }
 }

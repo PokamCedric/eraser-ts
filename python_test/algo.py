@@ -4,111 +4,46 @@ from collections import defaultdict
 # === INPUT DSL ===
 dsl = """
 
-users.teams <> teams.id
-workspaces.folderId > folders.id
-workspaces.teamId > teams.id
-chat.workspaceId > workspaces.id
-invite.workspaceId > workspaces.id
-invite.inviterId > users.id
-users.id > orders.userId
-orders.id > order_items.orderId
-order_items.productId > products.id
-products.categoryId > categories.id
-users.id > reviews.userId
-products.id > reviews.productId
-orders.paymentId > payments.id
-payments.userId > users.id
-orders.shipmentId > shipments.id
-shipments.addressId > addresses.id
-users.id > carts.userId
-carts.id > cart_items.cartId
-cart_items.productId > products.id
-users.id > addresses.userId
-orders.id > shipments.orderId
-users.addressId > addresses.id
-"""
+// One-to-One: Users to Profiles
+// Each user has exactly one profile
+users.profileId - profiles.id
 
-# === ÉTAPE 1 : Parser les relations selon la "Position Rule" ===
-# Position Rule: Le premier élément écrit est TOUJOURS à gauche
-# - A > B → A à gauche
-# - A < B → A à gauche (PAS B!)
-# - B < A → B à gauche
-# - A - B → A à gauche
-# - Le symbole (>, <, -, <>) n'affecte PAS la direction !
-pattern = re.compile(r'(\w+)\.\w*\s*([><-]{1,2})\s*(\w+)\.\w*')
-relations = []
-for line in dsl.splitlines():
-    m = pattern.search(line.strip())
-    if not m:
-        continue
-    left, symbol, right = m.groups()
-    # Position Rule: premier écrit = gauche, second = droite
-    relations.append((left, right))
+// Many-to-One: Posts to Users
+// Many posts belong to one author (user)
+posts.authorId > users.id
 
-print("=== ÉTAPE 1 : RELATIONS DÉTECTÉES ===")
-for a, b in relations:
-    print(f"{a} -> {b}")
+// Many-to-One: Users to Teams
+// Many users belong to one team
+users.id > teams.id
 
-# === ÉTAPE 2 : Classifier selon les 2 règles ===
-connections = defaultdict(int)
-for a, b in relations:
-    connections[a] += 1
-    connections[b] += 1
+// Many-to-One: Comments to Posts
+// Many comments belong to one post
+comments.postId > posts.id
 
-processed_entities = set()
-ordered_relations = []
-remaining = relations.copy()
+// Many-to-One: Comments to Users
+// Many comments belong to one user
+tags.userId > users.id
 
-def find_next_relation():
-    connected = [r for r in remaining if r[0] in processed_entities or r[1] in processed_entities]
-    if connected:
-        # Règle 1: Trier par nombre de connexions (max)
-        connected.sort(key=lambda x: max(connections[x[0]], connections[x[1]]), reverse=True)
-        return connected[0], "règle 1"
-    else:
-        # Règle 2: Trier par nombre de connexions (max)
-        remaining.sort(key=lambda x: max(connections[x[0]], connections[x[1]]), reverse=True)
-        return remaining[0], "règle 2"
+// Many-to-Many: Posts to Tags (through post_tags)
+// Posts can have many tags, tags can belong to many posts
+post_tags.postId > posts.id
+post_tags.tagId > tags.id
 
-while remaining:
-    (a, b), rule_used = find_next_relation()
-    ordered_relations.append((a, b))
-    processed_entities.update([a, b])
-    remaining = [r for r in remaining if r != (a, b)]
-
-print("\n=== ÉTAPE 2 : ORDRE FINAL DES RELATIONS ===")
-for a, b in ordered_relations:
-    print(f"{a} -> {b}")
-
-# === ÉTAPE 3 : Construire les couches (layers) ===
-import re
-from collections import defaultdict
-
-# === INPUT DSL ===
-dsl = """
-
-users.teams <> teams.id
-workspaces.folderId > folders.id
-workspaces.teamId > teams.id
-chat.workspaceId > workspaces.id
-invite.workspaceId > workspaces.id
-invite.inviterId > users.id
-users.id > orders.userId
-orders.id > order_items.orderId
-order_items.productId > products.id
-products.categoryId > categories.id
-users.id > reviews.userId
-products.id > reviews.productId
-orders.paymentId > payments.id
-payments.userId > users.id
-orders.shipmentId > shipments.id
-shipments.addressId > addresses.id
-users.id > carts.userId
-carts.id > cart_items.cartId
-cart_items.productId > products.id
-users.id > addresses.userId
-orders.id > shipments.orderId
-users.addressId > addresses.id
+// Alternative entity-level syntax (defaults to id fields):
+// users > teams
+// This is equivalent to: users.id > teams.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+projects.teamId > teams.id
+milestones.projectId > projects.id
+attachments.postId > posts.id
+notifications.userId > roles.id
+user_projects.userId > users.id
+user_projects.projectId > projects.id
+projects.id < posts.authorId
+comments.userId > users.id
 """
 
 # Flag pour choisir la variante en cas de cycle (Règle 3.2)
@@ -211,10 +146,47 @@ def normalize_layers(entity_layer):
     if not entity_layer:
         return
     min_layer = min(entity_layer.values())
-    if min_layer < 0:
+    if min_layer != 0:
         shift = -min_layer
         for ent in entity_layer:
             entity_layer[ent] += shift
+
+def optimize_placement(entity, entity_layer, directed_graph, connections_graph):
+    """
+    Optimise le placement d'une entité et de toutes celles qui pointent vers elle
+    pour respecter la Règle 2: Optimal Placement (distance minimale = 1)
+    """
+    # Trouver toutes les entités qui pointent vers 'entity' (parents)
+    parents = [e for e, targets in directed_graph.items() if entity in targets]
+
+    if not parents:
+        return  # Pas de parents, rien à optimiser
+
+    entity_layer_val = entity_layer[entity]
+
+    for parent in parents:
+        if parent not in entity_layer:
+            continue
+
+        parent_layer = entity_layer[parent]
+        expected_parent_layer = entity_layer_val - 1
+
+        # Si le parent est trop loin (distance > 1), le rapprocher
+        if parent_layer < expected_parent_layer:
+            # Essayer de placer au layer optimal (entity_layer - 1)
+            target_layer = expected_parent_layer
+
+            # Si conflit, essayer les layers entre parent_layer et expected_parent_layer
+            # en partant du plus proche de expected_parent_layer
+            for try_layer in range(expected_parent_layer, parent_layer - 1, -1):
+                entities_in_layer = [ent for ent, ly in entity_layer.items() if ly == try_layer]
+                has_conflict = any(ent in connections_graph[parent] for ent in entities_in_layer)
+
+                if not has_conflict:
+                    entity_layer[parent] = try_layer
+                    # Optimiser récursivement les parents de ce parent
+                    optimize_placement(parent, entity_layer, directed_graph, connections_graph)
+                    break
 
 print("\n=== ÉTAPE 3 : LAYERS ===")
 
@@ -256,6 +228,9 @@ for left, right in ordered_relations:
                     target_layer = left_layer + 1
                     valid_layer = find_valid_layer(right, target_layer, entity_layer, direction='right')
                     entity_layer[right] = valid_layer
+                    # APPEL 1: Optimiser après réorganisation du cycle
+                    optimize_placement(right, entity_layer, directed_graph, connections_graph)
+                    normalize_layers(entity_layer)
                 # Sinon: ne rien faire (garder l'ordre par défaut)
             else:
                 # Règle 3.1: Chaîne linéaire - appliquer la correction
@@ -263,6 +238,9 @@ for left, right in ordered_relations:
                 target_layer = left_layer + 1
                 valid_layer = find_valid_layer(right, target_layer, entity_layer, direction='right')
                 entity_layer[right] = valid_layer
+                # APPEL 2: Optimiser après déplacement (CRUCIAL!)
+                optimize_placement(right, entity_layer, directed_graph, connections_graph)
+                normalize_layers(entity_layer)
 
     # Rebuild layers dict
     layers = defaultdict(list)

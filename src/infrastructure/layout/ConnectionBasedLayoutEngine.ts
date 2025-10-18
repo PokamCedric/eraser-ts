@@ -45,7 +45,7 @@ export interface ConnectionLayerResult {
 export class ConnectionBasedLayoutEngine {
   // Flag to choose behavior on cycle detection (Rule 3.2)
   // true = reorder anyway, false = keep default order
-  private static PREFER_REORDER_ON_CYCLE = false;
+  private static PREFER_REORDER_ON_CYCLE = true;
   /**
    * STEP 1: Parse relationships and apply position rule (direction rule)
    *
@@ -208,14 +208,71 @@ export class ConnectionBasedLayoutEngine {
       }
     };
 
-    // Helper: Normalize layers if negative
+    // Helper: Normalize layers to always start at 0
     const normalizeLayers = () => {
+      if (entityLayer.size === 0) return;
+
       const minLayer = Math.min(...Array.from(entityLayer.values()));
-      if (minLayer < 0) {
+      if (minLayer !== 0) {
         const shift = -minLayer;
         entityLayer.forEach((layer, entity) => {
           entityLayer.set(entity, layer + shift);
         });
+      }
+    };
+
+    // Helper: Optimize placement after moving an entity (iterative, no recursion)
+    const optimizePlacement = (entity: string) => {
+      const queue: string[] = [entity];
+      const processed = new Set<string>();
+
+      while (queue.length > 0) {
+        const currentEntity = queue.shift()!;
+
+        // Avoid processing the same entity twice
+        if (processed.has(currentEntity)) continue;
+        processed.add(currentEntity);
+
+        // Find all entities that point to currentEntity (parents)
+        const parents: string[] = [];
+        directedGraph.forEach((targets, parent) => {
+          if (targets.has(currentEntity)) {
+            parents.push(parent);
+          }
+        });
+
+        if (parents.length === 0) continue;
+
+        const currentEntityLayer = entityLayer.get(currentEntity)!;
+
+        for (const parent of parents) {
+          if (!entityLayer.has(parent)) continue;
+
+          const parentLayer = entityLayer.get(parent)!;
+          const expectedParentLayer = currentEntityLayer - 1;
+
+          // If parent is too far (distance > 1), move it closer
+          if (parentLayer < expectedParentLayer) {
+            // Try layers between parentLayer and expectedParentLayer
+            // starting from the closest to expectedParentLayer
+            for (let tryLayer = expectedParentLayer; tryLayer >= parentLayer; tryLayer--) {
+              const entitiesInLayer = Array.from(entityLayer.entries())
+                .filter(([_, layer]) => layer === tryLayer)
+                .map(([ent, _]) => ent);
+
+              const hasConflict = entitiesInLayer.some(ent =>
+                connectionsGraph.get(parent)?.has(ent)
+              );
+
+              if (!hasConflict) {
+                entityLayer.set(parent, tryLayer);
+                // Add this parent to the queue to optimize its parents
+                queue.push(parent);
+                break;
+              }
+            }
+          }
+        }
       }
     };
 
@@ -279,6 +336,9 @@ export class ConnectionBasedLayoutEngine {
               const targetLayer = leftLayer + 1;
               const validLayer = findValidLayer(rel.right, targetLayer, 'right');
               entityLayer.set(rel.right, validLayer);
+              // Optimize placement after reordering
+              optimizePlacement(rel.right);
+              normalizeLayers();
             }
             // Otherwise: keep default order (do nothing)
           } else {
@@ -287,6 +347,9 @@ export class ConnectionBasedLayoutEngine {
             const targetLayer = leftLayer + 1;
             const validLayer = findValidLayer(rel.right, targetLayer, 'right');
             entityLayer.set(rel.right, validLayer);
+            // CRUCIAL: Optimize placement after moving
+            optimizePlacement(rel.right);
+            normalizeLayers();
           }
         }
         // Otherwise: order is correct
