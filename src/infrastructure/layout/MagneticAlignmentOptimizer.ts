@@ -1,27 +1,29 @@
 /**
- * Magnetic Alignment Optimizer (Orchestrator)
+ * Magnetic Alignment Optimizer
  *
- * Coordinates the 3 layout optimization algorithms:
- * 1. HorizontalLayeringAlgorithm - Determines X position (layers) - Already done in HierarchicalLayoutEngine
- * 2. VerticalOrderingAlgorithm - Determines Y ordering within layers
- * 3. FieldOrderingAlgorithm - Determines field ordering within entities
+ * Handles field ordering within entities to optimize visual alignment.
  *
- * This class is the main entry point that runs the algorithms in the correct sequence.
+ * NOTE: Entity layering and ordering is now handled by ConnectionBasedLayoutEngine
+ * which includes:
+ * - Horizontal layering (X positions)
+ * - Cluster-based vertical ordering (Y positions within layers)
+ * - Pivot detection and placement
+ *
+ * This class only handles field ordering within individual entities.
  */
 
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
-// import { VerticalOrderingAlgorithm } from './VerticalOrderingAlgorithm';
 import { FieldOrderingAlgorithm } from './FieldOrderingAlgorithm';
 
 export class MagneticAlignmentOptimizer {
   /**
-   * Run the complete optimization pipeline
+   * Optimize field ordering within entities
    *
    * @param entities - All entities
    * @param relationships - All relationships
-   * @param layers - Layers from horizontal layering (X positions already determined)
-   * @returns Optimized layers with entities ordered vertically
+   * @param layers - Layers from ConnectionBasedLayoutEngine (already ordered)
+   * @returns The same layers (entities are not reordered, only fields within entities)
    */
   static optimize(
     entities: Entity[],
@@ -30,9 +32,6 @@ export class MagneticAlignmentOptimizer {
   ): Map<number, string[]> {
     console.log('\n=== FIELD ORDERING OPTIMIZER ===');
     console.log('Optimizing field order within entities...\n');
-
-    // NOTE: Vertical ordering of entities is now done by ClusterBasedOrdering
-    // This optimizer now ONLY handles field ordering within entities
 
     // Optimize field ordering within entities
     FieldOrderingAlgorithm.optimize(entities, relationships, layers);

@@ -129,40 +129,36 @@ describe('ConnectionBasedLayoutEngine', () => {
       console.log('  VERIFICATION');
       console.log('========================================\n');
 
-      // Expected final result from the example:
-      // Layer 0: [comments, post_tags]
-      // Layer 1: [posts, tags, user_roles, role_permissions]
-      // Layer 2: [users, roles, permissions]
-      // Layer 3: [profiles, teams]
-
-      console.log('Expected:');
-      console.log('  Layer 0: [comments, post_tags]');
-      console.log('  Layer 1: [posts, tags, user_roles, role_permissions]');
-      console.log('  Layer 2: [users, roles, permissions]');
-      console.log('  Layer 3: [profiles, teams]');
+      // Expected final result from the algorithm:
+      // Layer 0: [user_roles, comments, role_permissions]
+      // Layer 1: [post_tags, roles, permissions]
+      // Layer 2: [posts, tags]
+      // Layer 3: [users]
+      // Layer 4: [profiles, teams]
 
       console.log('\nActual:');
       Array.from(result.layers.entries())
-        .sort((a, b) => a[0] - b[0])
-        .forEach(([layer, entities]) => {
+        .sort((a: [number, string[]], b: [number, string[]]) => a[0] - b[0])
+        .forEach(([layer, entities]: [number, string[]]) => {
           console.log(`  Layer ${layer}: [${entities.sort().join(', ')}]`);
         });
 
       // Verify layer structure
+      expect(result.layerOf.get('user_roles')).toBe(0);
       expect(result.layerOf.get('comments')).toBe(0);
-      expect(result.layerOf.get('post_tags')).toBe(0);
+      expect(result.layerOf.get('role_permissions')).toBe(0);
 
-      expect(result.layerOf.get('posts')).toBe(1);
-      expect(result.layerOf.get('tags')).toBe(1);
-      expect(result.layerOf.get('user_roles')).toBe(1);
-      expect(result.layerOf.get('role_permissions')).toBe(1);
+      expect(result.layerOf.get('post_tags')).toBe(1);
+      expect(result.layerOf.get('roles')).toBe(1);
+      expect(result.layerOf.get('permissions')).toBe(1);
 
-      expect(result.layerOf.get('users')).toBe(2);
-      expect(result.layerOf.get('roles')).toBe(2);
-      expect(result.layerOf.get('permissions')).toBe(2);
+      expect(result.layerOf.get('posts')).toBe(2);
+      expect(result.layerOf.get('tags')).toBe(2);
 
-      expect(result.layerOf.get('profiles')).toBe(3);
-      expect(result.layerOf.get('teams')).toBe(3);
+      expect(result.layerOf.get('users')).toBe(3);
+
+      expect(result.layerOf.get('profiles')).toBe(4);
+      expect(result.layerOf.get('teams')).toBe(4);
 
       // Verify Rule 1: minimum distance (connected entities in different layers)
       relationships.forEach(rel => {
@@ -500,8 +496,8 @@ describe('ConnectionBasedLayoutEngine', () => {
       const result = ConnectionBasedLayoutEngine.layout(entities, relationships);
 
       console.log('=== COMPUTED LAYERS ===\n');
-      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
-      for (const [layer, nodes] of sortedLayers) {
+      const sortedLayers = Array.from(result.layers.entries()).sort((a: [number, string[]], b: [number, string[]]) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers as [number, string[]][]) {
         console.log(`Layer ${layer}: ${nodes.sort().join(', ')}`);
       }
 
@@ -516,6 +512,196 @@ describe('ConnectionBasedLayoutEngine', () => {
       expect(result.layerOf.get('order_items')!).toBeLessThan(result.layerOf.get('orders')!);
       expect(result.layerOf.get('chat')!).toBeLessThan(result.layerOf.get('workspaces')!);
       expect(result.layerOf.get('products')!).toBeLessThan(result.layerOf.get('categories')!);
+    });
+  });
+
+  describe('Step 6: Vertical Ordering by Maximum Target Position', () => {
+    it('should order entities by maximum target position in next layer', () => {
+      console.log('\n======================================');
+      console.log('  VERTICAL ORDERING TEST');
+      console.log('======================================\n');
+
+      const entities: Entity[] = [
+        'users', 'workspaces', 'teams', 'folders', 'orders', 'carts'
+      ].map(name => ({
+        name,
+        displayName: name.charAt(0).toUpperCase() + name.slice(1),
+        fields: [],
+        color: '#fff',
+        icon: ''
+      }));
+
+      // Create scenario where vertical ordering matters:
+      // Layer 1: workspaces, users
+      // Layer 2: teams (pos 0), folders (pos 1), orders (pos 2), carts (pos 3)
+      //
+      // workspaces -> [folders, teams] -> max pos = 1
+      // users -> [teams, orders, carts] -> max pos = 3
+      //
+      // Expected: workspaces (max 1) comes before users (max 3)
+      const relationships: Relationship[] = [
+        { from: { entity: 'workspaces', field: 'folderId' }, to: { entity: 'folders', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'workspaces', field: 'teamId' }, to: { entity: 'teams', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'teamId' }, to: { entity: 'teams', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'orderId' }, to: { entity: 'orders', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'cartId' }, to: { entity: 'carts', field: 'id' }, type: 'many-to-one', color: '#888' },
+      ];
+
+      const result = ConnectionBasedLayoutEngine.layout(entities, relationships);
+
+      console.log('Expected vertical order in their layer:');
+      console.log('  workspaces (max target pos: 1) should come before users (max target pos: 3)');
+
+      console.log('\nActual layers:');
+      Array.from(result.layers.entries())
+        .sort((a: [number, string[]], b: [number, string[]]) => a[0] - b[0])
+        .forEach(([layer, entities]: [number, string[]]) => {
+          console.log(`  Layer ${layer}: [${entities.join(', ')}]`);
+        });
+
+      // Both should be in the same layer
+      const workspacesLayer = result.layerOf.get('workspaces')!;
+      const usersLayer = result.layerOf.get('users')!;
+      expect(workspacesLayer).toBe(usersLayer);
+
+      // Verify vertical ordering: workspaces should come before users
+      const layer = result.layers.get(workspacesLayer)!;
+      const workspacesIndex = layer.indexOf('workspaces');
+      const usersIndex = layer.indexOf('users');
+
+      console.log(`\nworkspaces index: ${workspacesIndex}, users index: ${usersIndex}`);
+      expect(workspacesIndex).toBeLessThan(usersIndex);
+
+      console.log('\n✓ Vertical ordering test passed!\n');
+    });
+
+    it('should place entities with no targets first in vertical order', () => {
+      const entities: Entity[] = [
+        'A', 'B', 'C', 'target'
+      ].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: ''
+      }));
+
+      // A -> target
+      // B -> target
+      // C -> (no target in next layer)
+      const relationships: Relationship[] = [
+        { from: { entity: 'A', field: 'targetId' }, to: { entity: 'target', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'B', field: 'targetId' }, to: { entity: 'target', field: 'id' }, type: 'many-to-one', color: '#888' },
+      ];
+
+      const result = ConnectionBasedLayoutEngine.layout(entities, relationships);
+
+      // C should be in a different layer or come first if in same layer as A,B
+      const layerC = result.layerOf.get('C')!;
+      const layerA = result.layerOf.get('A')!;
+
+      if (layerC === layerA) {
+        // If same layer, C should come first (no target = -1 position)
+        const layer = result.layers.get(layerC)!;
+        const indexC = layer.indexOf('C');
+        const indexA = layer.indexOf('A');
+        const indexB = layer.indexOf('B');
+
+        expect(indexC).toBeLessThan(indexA);
+        expect(indexC).toBeLessThan(indexB);
+      }
+    });
+  });
+
+  describe('Full ERP Schema Test - Algo4 Example', () => {
+    it('should match Python algo4.py expected output', () => {
+      console.log('\n======================================');
+      console.log('  FULL ERP SCHEMA - ALGO4 MATCH');
+      console.log('======================================\n');
+
+      const entities: Entity[] = [
+        'users', 'teams', 'workspaces', 'folders', 'chat', 'invite',
+        'orders', 'order_items', 'products', 'categories',
+        'reviews', 'payments', 'shipments', 'addresses',
+        'carts', 'cart_items'
+      ].map(name => ({
+        name,
+        displayName: name.charAt(0).toUpperCase() + name.slice(1),
+        fields: [],
+        color: '#fff',
+        icon: ''
+      }));
+
+      const relationships: Relationship[] = [
+        { from: { entity: 'users', field: 'id' }, to: { entity: 'teams', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'workspaces', field: 'id' }, to: { entity: 'folders', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'workspaces', field: 'id' }, to: { entity: 'teams', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'chat', field: 'id' }, to: { entity: 'workspaces', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'invite', field: 'id' }, to: { entity: 'workspaces', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'invite', field: 'id' }, to: { entity: 'users', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'id' }, to: { entity: 'orders', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'orders', field: 'id' }, to: { entity: 'order_items', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'order_items', field: 'id' }, to: { entity: 'products', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'products', field: 'id' }, to: { entity: 'categories', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'id' }, to: { entity: 'reviews', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'products', field: 'id' }, to: { entity: 'reviews', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'orders', field: 'id' }, to: { entity: 'payments', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'id' }, to: { entity: 'payments', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'orders', field: 'id' }, to: { entity: 'shipments', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'shipments', field: 'id' }, to: { entity: 'addresses', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'id' }, to: { entity: 'carts', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'carts', field: 'id' }, to: { entity: 'cart_items', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'cart_items', field: 'id' }, to: { entity: 'products', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'users', field: 'id' }, to: { entity: 'addresses', field: 'id' }, type: 'many-to-one', color: '#888' },
+      ];
+
+      const result = ConnectionBasedLayoutEngine.layout(entities, relationships);
+
+            // Expected final result from the algorithm:
+      // Layer 0: [invite, chat]
+      // Layer 1: [workspaces, users]
+      // Layer 2: [teams, folders, orders, carts]
+      // Layer 3: [payments, shipments, order_items, cart_items]
+      // Layer 4: [addresses, products]
+      // Layer 5: [reviews, categories]
+
+      console.log('\nActual (TypeScript):');
+      Array.from(result.layers.entries())
+        .sort((a: [number, string[]], b: [number, string[]]) => a[0] - b[0])
+        .forEach(([layer, entities]: [number, string[]]) => {
+          console.log(`Layer ${layer}: [${entities.join(', ')}]`);
+        });
+
+      // Verify horizontal layers
+      expect(result.layerOf.get('invite')).toBe(0);
+      expect(result.layerOf.get('chat')).toBe(0);
+
+      expect(result.layerOf.get('workspaces')).toBe(1);
+      expect(result.layerOf.get('users')).toBe(1);
+
+      expect(result.layerOf.get('teams')).toBe(2);
+      expect(result.layerOf.get('folders')).toBe(2);
+      expect(result.layerOf.get('orders')).toBe(2);
+      expect(result.layerOf.get('carts')).toBe(2);
+
+      expect(result.layerOf.get('payments')).toBe(3);
+      expect(result.layerOf.get('shipments')).toBe(3);
+      expect(result.layerOf.get('order_items')).toBe(3);
+      expect(result.layerOf.get('cart_items')).toBe(3);
+
+      expect(result.layerOf.get('addresses')).toBe(4);
+      expect(result.layerOf.get('products')).toBe(4);
+
+      expect(result.layerOf.get('reviews')).toBe(5);
+      expect(result.layerOf.get('categories')).toBe(5);
+
+      // Verify vertical ordering within Layer 1
+      const layer1 = result.layers.get(1)!;
+      const workspacesIdx = layer1.indexOf('workspaces');
+      const usersIdx = layer1.indexOf('users');
+      expect(workspacesIdx).toBeLessThan(usersIdx);
+
+      console.log('\n✓ Full ERP schema test passed!\n');
     });
   });
 });

@@ -1,252 +1,437 @@
-import re
-from collections import defaultdict
-
-# === INPUT DSL ===
-dsl = """
-
-// One-to-One: Users to Profiles
-// Each user has exactly one profile
-users.profileId - profiles.id
-
-// Many-to-One: Posts to Users
-// Many posts belong to one author (user)
-posts.authorId > users.id
-
-// Many-to-One: Users to Teams
-// Many users belong to one team
-users.id > teams.id
-
-// Many-to-One: Comments to Posts
-// Many comments belong to one post
-comments.postId > posts.id
-
-// Many-to-One: Comments to Users
-// Many comments belong to one user
-tags.userId > users.id
-
-// Many-to-Many: Posts to Tags (through post_tags)
-// Posts can have many tags, tags can belong to many posts
-post_tags.postId > posts.id
-post_tags.tagId > tags.id
-
-// Alternative entity-level syntax (defaults to id fields):
-// users > teams
-// This is equivalent to: users.id > teams.id
-user_roles.userId > users.id
-user_roles.roleId > roles.id
-role_permissions.roleId > roles.id
-role_permissions.permissionId > permissions.id
-projects.teamId > teams.id
-milestones.projectId > projects.id
-attachments.postId > posts.id
-notifications.userId > roles.id
-user_projects.userId > users.id
-user_projects.projectId > projects.id
-projects.id < posts.authorId
-comments.userId > users.id
+"""
+Algorithm with Step 6 - Vertical Ordering by Cluster
+Based on algo3.py with cluster-based vertical organization
 """
 
-# Flag pour choisir la variante en cas de cycle (Règle 3.2)
-PREFER_REORDER_ON_CYCLE = True  # False = garder l'ordre par défaut, True = réordonner
+from collections import defaultdict
 
-# === ÉTAPE 1 : Parser les relations selon la "Position Rule" ===
-pattern = re.compile(r'(\w+)\.\w*\s*([><-]{1,2})\s*(\w+)\.\w*')
+# === DONNÉES DE TEST ===
+relations_input = """
+users -> teams
+workspaces -> folders
+workspaces -> teams
+chat -> workspaces
+invite -> workspaces
+invite -> users
+users -> orders
+orders -> order_items
+order_items -> products
+products -> categories
+users -> reviews
+products -> reviews
+orders -> payments
+users -> payments
+orders -> shipments
+shipments -> addresses
+users -> carts
+carts -> cart_items
+cart_items -> products
+users -> addresses
+"""
+
+# Parse relations
 relations = []
-for line in dsl.splitlines():
-    m = pattern.search(line.strip())
-    if not m:
-        continue
-    left, symbol, right = m.groups()
-    relations.append((left, right))
+for line in relations_input.strip().split('\n'):
+    if '->' in line:
+        parts = line.strip().split('->')
+        a = parts[0].strip()
+        b = parts[1].strip()
+        relations.append((a, b))
 
 print("=== ÉTAPE 1 : RELATIONS DÉTECTÉES ===")
 for a, b in relations:
     print(f"{a} -> {b}")
 
-# === ÉTAPE 2 : Classifier selon les 2 règles ===
-connections = defaultdict(int)
-for a, b in relations:
-    connections[a] += 1
-    connections[b] += 1
+# === ÉTAPE 2 : ORDRE DES RELATIONS ===
+entity_order = ['users', 'orders', 'teams', 'workspaces', 'reviews', 'products',
+                'payments', 'carts', 'addresses', 'order_items', 'shipments',
+                'cart_items', 'folders', 'categories']
 
-processed_entities = set()
-ordered_relations = []
-remaining = relations.copy()
+print("\n=== ÉTAPE 2 : ORDRE DES ENTITÉS ===")
+print(f"Ordre: {' -> '.join(entity_order)}")
 
-def find_next_relation():
-    connected = [r for r in remaining if r[0] in processed_entities or r[1] in processed_entities]
-    if connected:
-        connected.sort(key=lambda x: max(connections[x[0]], connections[x[1]]), reverse=True)
-        return connected[0], "règle 1"
-    else:
-        remaining.sort(key=lambda x: max(connections[x[0]], connections[x[1]]), reverse=True)
-        return remaining[0], "règle 2"
+# === ÉTAPE 3 : BUILD CLUSTERS ===
+print("\n=== ÉTAPE 3 : BUILD CLUSTERS ===\n")
 
-while remaining:
-    (a, b), rule_used = find_next_relation()
-    ordered_relations.append((a, b))
-    processed_entities.update([a, b])
-    remaining = [r for r in remaining if r != (a, b)]
+clusters = {}
 
-print("\n=== ÉTAPE 2 : ORDRE FINAL DES RELATIONS ===")
-for a, b in ordered_relations:
-    print(f"{a} -> {b}")
+for iteration, entity_name in enumerate(entity_order, 1):
+    # Construire le cluster
+    cluster_left = []
+    cluster_right = [entity_name]
 
-# === ÉTAPE 3 : Construire les couches (layers) ===
-entity_layer = {}
-layers = defaultdict(list)
+    for a, b in relations:
+        if b == entity_name and a not in cluster_left:
+            cluster_left.append(a)
 
-# Construire un graphe DIRIGÉ des relations pour détecter les cycles
-directed_graph = defaultdict(set)
-for a, b in ordered_relations:
-    directed_graph[a].add(b)
+    clusters[entity_name] = {
+        'left': cluster_left,
+        'right': cluster_right
+    }
 
-# Construire un graphe des connexions (non-dirigé) pour vérifier les conflits
-connections_graph = defaultdict(set)
-for a, b in ordered_relations:
-    connections_graph[a].add(b)
-    connections_graph[b].add(a)
+    print(f"{iteration}) Cluster '{entity_name}':")
+    print(f"   {cluster_left} -> {cluster_right}")
 
-def has_cycle_between(left, right, directed_graph):
+# === ÉTAPE 4 : BUILD LAYERS ===
+print("\n=== ÉTAPE 4 : BUILD LAYERS ===\n")
+
+layers = []
+
+def find_layer_index(entity):
+    """Trouve l'index du layer contenant l'entité"""
+    for idx, layer in enumerate(layers):
+        if entity in layer:
+            return idx
+    return None
+
+def remove_from_layers(entity):
+    """Supprime une entité de tous les layers"""
+    for layer in layers:
+        while entity in layer:
+            layer.remove(entity)
+
+def can_add_to_layer(entity, layer_idx):
+    """Vérifie si on peut ajouter une entité à un layer"""
+    if layer_idx >= len(layers):
+        return True
+
+    # Vérifier qu'il n'y a pas de relation avec les entités du layer
+    for existing in layers[layer_idx]:
+        for a, b in relations:
+            if (a == entity and b == existing) or (a == existing and b == entity):
+                return False
+    return True
+
+def move_entity_to_right_of_parent(parent_entity, child_entity):
     """
-    Détecte s'il existe un cycle entre left et right
-    Un cycle existe si on peut aller de right vers left en suivant les arcs dirigés
+    Déplace child_entity à droite de parent_entity.
+    Retourne le nouveau layer_idx de child_entity.
     """
-    visited = set()
+    parent_layer = find_layer_index(parent_entity)
+    if parent_layer is None:
+        return None
 
-    def dfs(node, target):
-        if node == target:
-            return True
-        if node in visited:
-            return False
-        visited.add(node)
+    # Supprimer child de son layer actuel
+    remove_from_layers(child_entity)
 
-        for neighbor in directed_graph.get(node, []):
-            if dfs(neighbor, target):
-                return True
-        return False
+    # Chercher un layer à droite du parent où on peut placer child
+    for layer_idx in range(parent_layer + 1, len(layers)):
+        if can_add_to_layer(child_entity, layer_idx):
+            layers[layer_idx].append(child_entity)
+            return layer_idx
 
-    # Vérifier si right peut atteindre left (cycle)
-    return dfs(right, left)
+    # Aucun layer compatible trouvé : créer un nouveau layer
+    layers.append([child_entity])
+    return len(layers) - 1
 
-def find_valid_layer(entity, target_layer, entity_layer, direction='right'):
-    while True:
-        entities_in_layer = [ent for ent, ly in entity_layer.items() if ly == target_layer]
-        has_conflict = any(ent in connections_graph[entity] for ent in entities_in_layer)
+# Traiter chaque entité
+for iteration, entity_name in enumerate(entity_order, 1):
+    print(f"{iteration}) Entité '{entity_name}':")
 
-        if not has_conflict:
-            return target_layer
+    cluster_left = clusters[entity_name]['left']
+    cluster_right = clusters[entity_name]['right']
+
+    print(f"cluster-{entity_name} -> {cluster_left} -> {cluster_right}")
+    print()
+
+    # Premier cluster
+    if not layers:
+        if cluster_left:
+            layers.append(cluster_left[:])
+        layers.append(cluster_right[:])
+        print(f"=>")
+        for idx, layer in enumerate(layers):
+            print(f"Layer {idx}: {layer}")
+        print()
+        continue
+
+    # Chercher une ancre
+    anchor = None
+    anchor_layer = None
+    anchor_location = None
+
+    # Chercher dans RIGHT
+    for e in cluster_right:
+        idx = find_layer_index(e)
+        if idx is not None:
+            anchor = e
+            anchor_layer = idx
+            anchor_location = 'right'
+            break
+
+    # Chercher dans LEFT
+    if anchor is None:
+        for e in cluster_left:
+            idx = find_layer_index(e)
+            if idx is not None:
+                anchor = e
+                anchor_layer = idx
+                anchor_location = 'left'
+                break
+
+    # Pas d'ancre
+    if anchor is None:
+        new_layers = []
+        if cluster_left:
+            new_layers.append(cluster_left[:])
+        new_layers.append(cluster_right[:])
+        layers[:0] = new_layers
+        print(f"=>")
+        for idx, layer in enumerate(layers):
+            print(f"Layer {idx}: {layer}")
+        print()
+        continue
+
+    print()
+
+    if anchor_location == 'right':
+        # RIGHT (entity_name) existe déjà
+        # Il faut déplacer RIGHT et tous ses enfants à droite de LEFT
+
+        # 1. Identifier tous les enfants (descendants) de RIGHT
+        def get_children(parent):
+            """Retourne les enfants directs de parent"""
+            children = []
+            for a, b in relations:
+                if a == parent:
+                    children.append(b)
+            return children
+
+        def get_all_descendants(root):
+            """Retourne tous les descendants (récursif)"""
+            descendants = []
+            visited = set()
+            queue = [root]
+
+            while queue:
+                current = queue.pop(0)
+                if current in visited:
+                    continue
+                visited.add(current)
+
+                children = get_children(current)
+                for child in children:
+                    if child not in descendants:
+                        descendants.append(child)
+                        queue.append(child)
+
+            return descendants
+
+        # 2. Supprimer RIGHT et tous ses descendants
+        descendants = get_all_descendants(entity_name)
+        remove_from_layers(entity_name)
+        for desc in descendants:
+            remove_from_layers(desc)
+
+        # 3. Placer les entités de LEFT (si elles ne sont pas déjà placées)
+        for left_entity in cluster_left:
+            if find_layer_index(left_entity) is None:
+                # Chercher un layer compatible
+                placed = False
+                for layer_idx in range(len(layers)):
+                    if can_add_to_layer(left_entity, layer_idx):
+                        layers[layer_idx].append(left_entity)
+                        placed = True
+                        break
+
+                if not placed:
+                    layers.append([left_entity])
+
+        # 4. Trouver le layer max des LEFT
+        left_layers = [find_layer_index(e) for e in cluster_left if find_layer_index(e) is not None]
+        if left_layers:
+            max_left_layer = max(left_layers)
         else:
-            if direction == 'right':
-                target_layer += 1
-            else:
-                target_layer -= 1
+            max_left_layer = -1
 
-def normalize_layers(entity_layer):
-    if not entity_layer:
+        # 5. Placer RIGHT à droite du max LEFT
+        right_placed_layer = None
+        for layer_idx in range(max_left_layer + 1, len(layers)):
+            if can_add_to_layer(entity_name, layer_idx):
+                layers[layer_idx].append(entity_name)
+                right_placed_layer = layer_idx
+                break
+
+        if right_placed_layer is None:
+            layers.append([entity_name])
+            right_placed_layer = len(layers) - 1
+
+        # 6. Replacer les descendants en cascade
+        # Pour chaque descendant, le parent le déplace à sa droite
+        # On traite par niveaux (BFS)
+        if descendants:
+            # Organiser par niveaux
+            level_map = {entity_name: 0}
+            queue = [entity_name]
+
+            while queue:
+                current = queue.pop(0)
+                current_level = level_map[current]
+                children = get_children(current)
+
+                for child in children:
+                    if child in descendants and child not in level_map:
+                        level_map[child] = current_level + 1
+                        queue.append(child)
+
+            # Trier descendants par niveau
+            descendants_sorted = sorted(descendants, key=lambda x: level_map.get(x, 999))
+
+            # Placer chaque descendant
+            for desc in descendants_sorted:
+                # Trouver le parent dans la relation
+                parent = None
+                for a, b in relations:
+                    if b == desc and (a == entity_name or a in descendants_sorted):
+                        parent_layer = find_layer_index(a)
+                        if parent_layer is not None:
+                            parent = a
+                            break
+
+                if parent:
+                    move_entity_to_right_of_parent(parent, desc)
+
+    else:  # anchor_location == 'left'
+        # LEFT existe déjà
+
+        # Identifier les pivots
+        pivots = []
+        for e in cluster_left:
+            if e != anchor and find_layer_index(e) is not None:
+                pivots.append(e)
+
+        # Ajouter les non-pivots au layer de l'ancre
+        anchor_layer = find_layer_index(anchor)
+        for e in cluster_left:
+            if e != anchor and e not in pivots and e not in layers[anchor_layer]:
+                layers[anchor_layer].append(e)
+
+        # Placer RIGHT à droite de l'ancre
+        right_placed = False
+        for layer_idx in range(anchor_layer + 1, len(layers)):
+            if can_add_to_layer(entity_name, layer_idx):
+                layers[layer_idx].append(entity_name)
+                right_placed = True
+                break
+
+        if not right_placed:
+            layers.append([entity_name])
+
+    print(f"=>")
+    for idx, layer in enumerate(layers):
+        print(f"Layer {idx}: {layer}")
+    print()
+
+# Nettoyer les layers vides
+layers = [layer for layer in layers if layer]
+
+print("\n=== LAYERS APRÈS ÉTAPE 4 ===\n")
+for idx, layer in enumerate(layers):
+    print(f"Layer {idx}: {layer}")
+
+# === ÉTAPE 6 : REORDER ELEMENTS WITHIN LAYERS ===
+print("\n=== ÉTAPE 6 : RÉORGANISATION VERTICALE PAR CLUSTER ===\n")
+
+def reorder_layers_by_cluster():
+    """
+    Réorganise les entités dans chaque layer selon l'organisation en clusters.
+
+    LA CLÉ: Grouper les entités qui appartiennent au MÊME cluster
+    (qui pointent vers la même entité dans le layer suivant)
+
+    Algorithme:
+    1. Dernier layer: ordre selon entity_order
+    2. Autres layers (de droite à gauche):
+       - Pour chaque entité du layer suivant (dans l'ordre):
+         - Grouper toutes les entités du layer actuel qui pointent vers elle (même cluster)
+       - Les entités sans connexion au layer suivant viennent en premier
+    """
+    global layers
+
+    if not layers:
         return
-    min_layer = min(entity_layer.values())
-    if min_layer != 0:
-        shift = -min_layer
-        for ent in entity_layer:
-            entity_layer[ent] += shift
 
-def optimize_placement(entity, entity_layer, directed_graph, connections_graph):
-    """
-    Optimise le placement d'une entité et de toutes celles qui pointent vers elle
-    pour respecter la Règle 2: Optimal Placement (distance minimale = 1)
-    """
-    # Trouver toutes les entités qui pointent vers 'entity' (parents)
-    parents = [e for e, targets in directed_graph.items() if entity in targets]
+    # Layer le plus à droite: ordonner selon entity_order
+    last_layer_idx = len(layers) - 1
+    last_layer = layers[last_layer_idx]
 
-    if not parents:
-        return  # Pas de parents, rien à optimiser
+    # Ordonner selon entity_order
+    ordered_last = []
+    for entity in entity_order:
+        if entity in last_layer:
+            ordered_last.append(entity)
 
-    entity_layer_val = entity_layer[entity]
+    # Ajouter les entités non dans entity_order (ne devrait pas arriver)
+    for entity in last_layer:
+        if entity not in ordered_last:
+            ordered_last.append(entity)
 
-    for parent in parents:
-        if parent not in entity_layer:
-            continue
+    layers[last_layer_idx] = ordered_last
+    print(f"Layer {last_layer_idx}: {last_layer} -> {ordered_last}")
 
-        parent_layer = entity_layer[parent]
-        expected_parent_layer = entity_layer_val - 1
+    # Traiter les autres layers de droite à gauche
+    for layer_idx in range(len(layers) - 2, -1, -1):
+        current_layer = layers[layer_idx]
+        next_layer = layers[layer_idx + 1]
 
-        # Si le parent est trop loin (distance > 1), le rapprocher
-        if parent_layer < expected_parent_layer:
-            # Essayer de placer au layer optimal (entity_layer - 1)
-            target_layer = expected_parent_layer
+        print(f"\nLayer {layer_idx}: {current_layer}")
 
-            # Si conflit, essayer les layers entre parent_layer et expected_parent_layer
-            # en partant du plus proche de expected_parent_layer
-            for try_layer in range(expected_parent_layer, parent_layer - 1, -1):
-                entities_in_layer = [ent for ent, ly in entity_layer.items() if ly == try_layer]
-                has_conflict = any(ent in connections_graph[parent] for ent in entities_in_layer)
+        # NOUVELLE LOGIQUE: Trouver TOUTES les cibles pour chaque entité
+        entity_to_all_targets = {}
+        for entity in current_layer:
+            targets = []
+            for a, b in relations:
+                if a == entity and b in next_layer:
+                    targets.append(b)
+            entity_to_all_targets[entity] = targets
 
-                if not has_conflict:
-                    entity_layer[parent] = try_layer
-                    # Optimiser récursivement les parents de ce parent
-                    optimize_placement(parent, entity_layer, directed_graph, connections_graph)
-                    break
+        print(f"   Connexions multiples: {entity_to_all_targets}")
 
-print("\n=== ÉTAPE 3 : LAYERS ===")
+        # NOUVELLE STRATÉGIE: Ordonner par la position MAXIMALE de leurs cibles
+        # Entités pointant vers des cibles plus tôt viennent avant les entités pointant vers des cibles plus tard
 
-for left, right in ordered_relations:
-    left_exists = left in entity_layer
-    right_exists = right in entity_layer
-
-    if not left_exists and not right_exists:
-        entity_layer[left] = 0
-        entity_layer[right] = 1
-
-    elif not left_exists and right_exists:
-        right_layer = entity_layer[right]
-        target_layer = right_layer - 1
-        valid_layer = find_valid_layer(left, target_layer, entity_layer, direction='left')
-        entity_layer[left] = valid_layer
-        normalize_layers(entity_layer)
-
-    elif left_exists and not right_exists:
-        left_layer = entity_layer[left]
-        target_layer = left_layer + 1
-        valid_layer = find_valid_layer(right, target_layer, entity_layer, direction='right')
-        entity_layer[right] = valid_layer
-
-    else:
-        # Cas 4: Les deux existent déjà
-        left_layer = entity_layer[left]
-        right_layer = entity_layer[right]
-
-        if left_layer > right_layer:
-            # Détecter si c'est un cycle (Règle 3.2) ou une chaîne linéaire (Règle 3.1)
-            is_cycle = has_cycle_between(left, right, directed_graph)
-
-            if is_cycle:
-                # Règle 3.2: Cycle détecté (triangle)
-                print(f"  [CYCLE DÉTECTÉ] {left} -> {right} (garder ordre par défaut)")
-                if PREFER_REORDER_ON_CYCLE:
-                    # Option: réordonner quand même
-                    target_layer = left_layer + 1
-                    valid_layer = find_valid_layer(right, target_layer, entity_layer, direction='right')
-                    entity_layer[right] = valid_layer
-                    # APPEL 1: Optimiser après réorganisation du cycle
-                    optimize_placement(right, entity_layer, directed_graph, connections_graph)
-                    normalize_layers(entity_layer)
-                # Sinon: ne rien faire (garder l'ordre par défaut)
+        # 1. Calculer pour chaque entité la position max de ses cibles
+        entity_max_target_pos = {}
+        for entity in current_layer:
+            targets = entity_to_all_targets[entity]
+            if not targets:
+                entity_max_target_pos[entity] = -1  # Pas de cible = vient en premier
             else:
-                # Règle 3.1: Chaîne linéaire - appliquer la correction
-                print(f"  [CHAÎNE LINÉAIRE] {left} -> {right} (déplacer {right})")
-                target_layer = left_layer + 1
-                valid_layer = find_valid_layer(right, target_layer, entity_layer, direction='right')
-                entity_layer[right] = valid_layer
-                # APPEL 2: Optimiser après déplacement (CRUCIAL!)
-                optimize_placement(right, entity_layer, directed_graph, connections_graph)
-                normalize_layers(entity_layer)
+                max_pos = max(next_layer.index(t) for t in targets)
+                entity_max_target_pos[entity] = max_pos
 
-    # Rebuild layers dict
-    layers = defaultdict(list)
-    for ent, ly in entity_layer.items():
-        layers[ly].append(ent)
+        print(f"   Max target positions: {entity_max_target_pos}")
 
-    # Print after update
-    layer_str = " + ".join([f"Layer {ly} {layers[ly]}" for ly in sorted(layers.keys())])
-    print(f"- {left} -> {right} -> {layer_str}")
+        # 2. Trier les entités par position maximale de cible
+        ordered_layer = sorted(current_layer, key=lambda e: (
+            entity_max_target_pos[e],
+            entity_order.index(e) if e in entity_order else 999
+        ))
+
+        # Log clusters for debugging
+        for target_entity in next_layer:
+            entities_pointing_to_target = [e for e in current_layer
+                                          if target_entity in entity_to_all_targets[e]]
+            if entities_pointing_to_target:
+                print(f"   Cluster -> {target_entity}: {entities_pointing_to_target}")
+
+        layers[layer_idx] = ordered_layer
+        print(f"   => {ordered_layer}")
+
+reorder_layers_by_cluster()
+
+print("\n=== RÉSULTAT FINAL AVEC ORGANISATION VERTICALE ===\n")
+for idx, layer in enumerate(layers):
+    print(f"Layer {idx}: {layer}")
+
+print("\n=== VISUALISATION 2D ===\n")
+max_entities = max(len(layer) for layer in layers)
+for row in range(max_entities):
+    line = ""
+    for layer in layers:
+        if row < len(layer):
+            entity = layer[row]
+            line += f"{entity:20}"
+        else:
+            line += " " * 20
+    print(line)

@@ -10,7 +10,6 @@ import { Position } from '../../domain/value-objects/Position';
 import { ConnectionBasedLayoutEngine } from '../layout/ConnectionBasedLayoutEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
-import { ClusterBasedOrdering } from '../layout/ClusterBasedOrdering';
 import { getRelationshipCardinality } from '../../data/models/utils';
 
 interface MousePosition {
@@ -161,26 +160,24 @@ export class CanvasRendererAdapter implements IRenderer {
   autoLayout(): void {
     this.entityPositions.clear();
 
-    // Step 1 & 2: Compute hierarchical layers using connection-based algorithm
-    // This respects Rules 1, 2, and 3
-    let { layers } = ConnectionBasedLayoutEngine.layout(this.entities, this.relationships);
+    // Step 1-6: Compute hierarchical layers using connection-based algorithm
+    // This algorithm includes:
+    // - Step 1: Parse relationships and apply position rule
+    // - Step 2: Order relationships by entity
+    // - Step 3: Build clusters
+    // - Step 4: Build layers from clusters
+    // - Step 5: Optimize layers by merging compatible ones
+    // - Step 6: Reorder elements within layers based on cluster alignment
+    const { layers } = ConnectionBasedLayoutEngine.layout(this.entities, this.relationships);
 
-    // Step 3: CLUSTER-BASED Y-ORDERING
-    // Groups entities by shared connections, identifies pivots,
-    // and orders by eccentricity (distance to furthest connection)
-    const orderedLayers = ClusterBasedOrdering.optimize(
-      layers,
-      this.relationships
-    );
-
-    // Step 4: Field ordering within entities (only reorder fields, not entities)
+    // Step 7: Field ordering within entities (only reorder fields, not entities)
     const finalLayers = MagneticAlignmentOptimizer.optimize(
       this.entities,
       this.relationships,
-      orderedLayers
+      layers
     );
 
-    // Step 5: Calculate positions based on optimized ordering
+    // Step 8: Calculate positions based on optimized ordering
     const positions = LayoutPositioner.calculatePositions(
       finalLayers,
       this.entities,  // Pass entities to calculate heights
@@ -198,10 +195,10 @@ export class CanvasRendererAdapter implements IRenderer {
     // Apply positions
     this.entityPositions = positions;
 
-    // Step 6: Debug output
+    // Step 9: Debug output
     this._logLayoutDebugInfo(finalLayers);
 
-    // Step 7: Fit to screen
+    // Step 10: Fit to screen
     this.fitToScreen();
   }
 

@@ -1,464 +1,405 @@
 # Connection-Based Layout Algorithm
 
-## Vue d'ensemble
+A 2D entity layout algorithm that organizes entities both **horizontally** (in layers) and **vertically** (within layers) based on their relationship structure. The core innovation is **cluster-based organization** that enables optimal positioning in both dimensions.
 
-L'algorithme **Connection-Based Layout** est un algorithme de placement d'entités en couches (layers) qui se base sur les connexions entre entités plutôt que sur une hiérarchie stricte.
+## Overview
 
-### Philosophie
+The algorithm takes parsed entities and relationships from the DSL parser and organizes them into a clean 2D layout. It consists of 6 steps that transform relationship data into an optimized hierarchical structure.
 
-- **Position Rule** : L'ordre d'écriture détermine la direction (gauche → droite)
-- **Connection First** : Les entités avec le plus de connexions sont traitées en priorité
-- **Conflict Avoidance** : Les entités connectées ne peuvent jamais cohabiter dans le même layer
-- **Distance Minimization** : Distance minimale = 1 layer entre entités connectées
+**Key Innovation:** **Clusters** - Local relationship groups that determine both horizontal layering AND vertical positioning
 
----
+**Input:** Entities and relationships from `DSLParserAdapter`
+**Output:** Optimized 2D positions (layers + ordering within layers)
+**Direction:** Left to right (dependencies → dependents), Top to bottom (cluster alignment)
 
-## Les 3 Étapes de l'Algorithme
+### The Power of Clusters
 
-```
-STEP 1: Parse Relations (Position Rule)
-   ↓
-STEP 2: Order Relations (Connection Priority)
-   ↓
-STEP 3: Build Layers (Incremental Placement)
-```
+Originally, the algorithm only handled **horizontal ordering** (which layer an entity belongs to). The introduction of **clusters** revolutionized this by enabling:
 
----
+1. **Horizontal Organization:** Clusters determine layer boundaries (which entities go left, which go right)
+2. **Vertical Organization:** Clusters determine stacking order within each layer (which entities go top, which go bottom)
 
-## STEP 1: Parse Relations (Position Rule)
-
-### Objectif
-Parser les relations et appliquer la **Position Rule** pour déterminer la direction.
-
-### Position Rule (Règle de Direction)
-
-**Principe fondamental** : Le **premier élément écrit** est TOUJOURS à gauche. Le symbole (`>`, `<`, `-`, `<>`) **n'a AUCUN effet** sur la direction !
-
-#### Exemples
-
-```
-A > B  →  A à gauche, B à droite
-A < B  →  A à gauche, B à droite (PAS B à gauche !)
-A - B  →  A à gauche, B à droite
-A <> B →  A à gauche, B à droite
-B - A  →  B à gauche, A à droite
-```
-
-#### Pourquoi cette règle ?
-
-- **Simplicité** : Pas besoin d'interpréter les symboles
-- **Contrôle utilisateur** : L'utilisateur décide de la direction en choisissant l'ordre d'écriture
-- **Philosophie** : Une relation n'indique pas de sens intrinsèque
-
-### Sortie de l'étape 1
-
-Liste de relations directionnelles : `(left, right)`
-
-**Exemple :**
-```
-Input:
-  users.profileId - profiles.id
-  posts.authorId > users.id
-  users.id > teams.id
-
-Output:
-  users → profiles
-  posts → users
-  users → teams
-```
+**Without clusters:** Flat list of entities → Only horizontal ordering
+**With clusters:** Hierarchical relationship groups → Both horizontal AND vertical ordering
 
 ---
 
-## STEP 2: Order Relations (Connection Priority)
+## Complete Example: Project Management System
 
-### Objectif
-Déterminer l'**ordre de traitement** des relations en utilisant deux règles de priorité.
-
-### Règle 1 : Relations Connectées
-Si une relation connecte une entité **déjà traitée**, elle a la priorité.
-
-**Critère de tri** : Nombre de connexions (maximum en premier)
-
-### Règle 2 : Démarrage
-Si aucune relation n'est connectée aux entités déjà traitées, commencer par l'entité avec le **plus de connexions**.
-
-### Algorithme
+### Input DSL
 
 ```
-1. Compter les connexions de chaque entité
-2. Initialiser : processed_entities = {}, ordered_relations = []
-3. Tant qu'il reste des relations:
-   a. Chercher les relations connectées aux entités déjà traitées
-   b. Si trouvées:
-      - Trier par nombre de connexions (max)
-      - Prendre la première
-   c. Sinon (démarrage):
-      - Trier toutes les relations par nombre de connexions (max)
-      - Prendre la première
-   d. Ajouter à ordered_relations
-   e. Marquer les entités comme traitées
+users.profileId - profiles.id
+posts.authorId > users.id
+users.id > teams.id
+comments.postId > posts.id
+tags.userId > users.id
+post_tags.postId > posts.id
+post_tags.tagId > tags.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+projects.teamId > teams.id
+milestones.projectId > projects.id
+attachments.postId > posts.id
+notifications.userId > roles.id
+user_projects.userId > users.id
+user_projects.projectId > projects.id
+projects.id < posts.authorId
+comments.userId > users.id
 ```
 
-### Exemple Complet
+**Result:** 19 relationships between 16 entities
 
-#### Input
-```
-1. users → profiles
-2. posts → users
-3. users → teams
-4. comments → posts
-5. tags → users
-6. post_tags → posts
-7. post_tags → tags
-8. user_roles → users
-9. user_roles → roles
-10. role_permissions → roles
-11. role_permissions → permissions
-```
+---
 
-#### Comptage des connexions
-```
-users: 5 connexions (1, 2, 3, 5, 8)
-posts: 3 connexions (2, 4, 6)
-profiles: 1 connexion (1)
-teams: 1 connexion (3)
-tags: 2 connexions (5, 7)
-comments: 1 connexion (4)
-post_tags: 2 connexions (6, 7)
-user_roles: 2 connexions (8, 9)
-roles: 2 connexions (9, 10)
-role_permissions: 2 connexions (10, 11)
-permissions: 1 connexion (11)
-```
+## Step 1: Convert to Directed Relations
 
-#### Ordre final (Step 2)
+**Purpose:** Convert parsed `Relationship` objects to simple directed pairs
+
+**Rule:** The `from` entity is always LEFT, `to` entity is always RIGHT
+The symbol (`>`, `<`, `-`, `<>`) has NO effect - DSLParserAdapter handles that
+
+**Output:**
 ```
-1. users → profiles       (Règle 2: users a 5 connexions - maximum)
-2. posts → users          (Règle 1: users déjà traité, posts a 3 connexions)
-3. users → teams          (Règle 1: users déjà traité)
-4. tags → users           (Règle 1: users déjà traité)
-5. user_roles → users     (Règle 1: users déjà traité)
-6. comments → posts       (Règle 1: posts déjà traité)
-7. post_tags → posts      (Règle 1: posts déjà traité)
-8. post_tags → tags       (Règle 1: post_tags et tags déjà traités)
-9. user_roles → roles     (Règle 1: user_roles déjà traité)
-10. role_permissions → roles     (Règle 1: roles déjà traité)
-11. role_permissions → permissions (Règle 1: role_permissions déjà traité)
+users -> profiles       comments -> posts       projects -> teams
+posts -> users          tags -> users           milestones -> projects
+users -> teams          post_tags -> posts      attachments -> posts
+post_tags -> tags       user_roles -> users     notifications -> roles
+user_roles -> roles     user_projects -> users  projects -> posts
+role_permissions -> roles    user_projects -> projects    comments -> users
+role_permissions -> permissions
 ```
 
 ---
 
-## STEP 3: Build Layers (Incremental Placement)
+## Step 2: Order Relations by Entity
 
-### Objectif
-Construire les layers en plaçant chaque relation de manière incrémentale.
+**Purpose:** Organize relations into processing order based on connectivity
 
-### Les 3 Règles Fondamentales
+**Algorithm:**
+1. Count total connections per entity
+2. Iteratively process relations:
+   - Prioritize relations connected to already-processed entities
+   - Sort by connection count (descending)
+3. Group relations by main entity (most connected or already seen)
 
-#### Règle 1 : Non-Cohabitation
-**Deux entités connectées ne peuvent JAMAIS être dans le même layer.**
+**Output:**
 
-#### Règle 2 : Distance Minimale avec Vérification de Conflits
-**Distance minimale = 1 layer**, mais il faut vérifier qu'il n'y a pas de conflit.
-
-**Conflit** : Un layer contient une entité connectée à l'entité qu'on veut placer.
-
-**Solution** :
-- Si placement à **droite** (right) → **incrémenter** jusqu'à trouver un layer sans conflit
-- Si placement à **gauche** (left) → **décrémenter** jusqu'à trouver un layer sans conflit
-
-#### Règle 3 : Direction
-**Left** est toujours à gauche de **Right** (layer(left) < layer(right))
-
-### Les 4 Cas de Placement
-
-#### Cas 1 : Ni left ni right n'existent
 ```
-Action:
-  layer[left] = 0
-  layer[right] = 1
-```
+Entity 'users' (7 connections):
+  users -> profiles, posts -> users, users -> teams
+  tags -> users, user_roles -> users, user_projects -> users, comments -> users
 
-#### Cas 2 : Seulement right existe
-```
-Action:
-  1. target_layer = layer[right] - 1
-  2. valid_layer = findValidLayer(left, target_layer, direction='left')
-  3. layer[left] = valid_layer
-  4. Normaliser si layers négatifs
-```
+Entity 'posts' (4 connections):
+  comments -> posts, post_tags -> posts, attachments -> posts, projects -> posts
 
-**findValidLayer avec direction='left'** :
-- Vérifier si target_layer contient des entités connectées à `left`
-- Si conflit → **décrémenter** et revérifier
-- Sinon → retourner target_layer
+Entity 'projects' (4 connections):
+  projects -> teams, milestones -> projects
+  user_projects -> projects, projects -> posts
 
-#### Cas 3 : Seulement left existe
-```
-Action:
-  1. target_layer = layer[left] + 1
-  2. valid_layer = findValidLayer(right, target_layer, direction='right')
-  3. layer[right] = valid_layer
-```
+Entity 'roles' (3 connections):
+  user_roles -> roles, role_permissions -> roles, notifications -> roles
 
-**findValidLayer avec direction='right'** :
-- Vérifier si target_layer contient des entités connectées à `right`
-- Si conflit → **incrémenter** et revérifier
-- Sinon → retourner target_layer
+Entity 'post_tags' (2 connections):
+  post_tags -> tags
 
-#### Cas 4 : Les deux existent
-```
-Action:
-  Si layer[left] >= layer[right]:
-    1. shift_amount = layer[left] + 1 - layer[right]
-    2. Pour chaque entité:
-       Si layer[entité] >= layer[right]:
-         layer[entité] += shift_amount
-```
+Entity 'role_permissions' (2 connections):
+  role_permissions -> permissions
 
-### Normalisation des Layers
-
-Si après un placement, le layer minimum est négatif :
+Processing order: users → posts → projects → roles → post_tags → role_permissions
 ```
-shift = -min_layer
-Pour chaque entité:
-  layer[entité] += shift
-```
-
-Cela garantit que tous les layers sont >= 0.
 
 ---
 
-## Scénario Complet : Système RBAC
+## Step 3: Build Clusters ⭐ CORE INNOVATION
 
-### Input Relations
+**Purpose:** Create entity clusters representing local dependency structures
 
+**Why Clusters Are Critical:**
+Clusters are the KEY to 2D organization. They provide:
+1. **Horizontal structure:** Define which entities belong to the same layer
+2. **Vertical structure:** Define ordering within layers (cluster members stay together)
+3. **Relationship preservation:** Keep connected entities visually close
+
+**Cluster Definition:**
+- **LEFT (Layer N):** All entities pointing TO the cluster entity (dependencies)
+- **RIGHT (Layer N+1):** The cluster entity itself (dependent)
+- **Cluster group:** LEFT entities should be vertically aligned with RIGHT entity
+
+**Example of Cluster Power:**
 ```
-1. users.profileId - profiles.id
-2. posts.authorId > users.id
-3. users.id > teams.id
-4. comments.postId > posts.id
-5. tags.userId > users.id
-6. post_tags.postId > posts.id
-7. post_tags.tagId > tags.id
-8. user_roles.userId > users.id
-9. user_roles.roleId > roles.id
-10. role_permissions.roleId > roles.id
-11. role_permissions.permissionId > permissions.id
-```
+Cluster 'users':
+  LEFT:  [posts, tags, user_roles, user_projects, comments]
+  RIGHT: [users]
 
-### STEP 1 : Parse (Position Rule)
-
-```
-users → profiles
-posts → users
-users → teams
-comments → posts
-tags → users
-post_tags → posts
-post_tags → tags
-user_roles → users
-user_roles → roles
-role_permissions → roles
-role_permissions → permissions
+This means:
+- Horizontal: posts, tags, etc. go in layer N, users goes in layer N+1
+- Vertical: posts, tags, etc. stack together in layer N (they all connect to users)
 ```
 
-### STEP 2 : Order (déjà montré ci-dessus)
+**Output:**
 
 ```
-Ordre final:
-1. users → profiles
-2. posts → users
-3. users → teams
-4. tags → users
-5. user_roles → users
-6. comments → posts
-7. post_tags → posts
-8. post_tags → tags
-9. user_roles → roles
-10. role_permissions → roles
-11. role_permissions → permissions
+Cluster 1 'users':
+  [posts, tags, user_roles, user_projects, comments] -> [users] -> [profiles, teams]
+
+Cluster 2 'posts':
+  [comments, post_tags, attachments, projects] -> [posts] -> [users]
+
+Cluster 3 'projects':
+  [milestones, user_projects] -> [projects] -> [posts, teams]
+
+Cluster 4 'roles':
+  [user_roles, role_permissions, notifications] -> [roles]
+
+Cluster 5 'permissions':
+  [role_permissions] -> [permissions]
+
+Cluster 6 'profiles':
+  [users] -> [profiles]
+
+Cluster 7 'tags':
+  [post_tags] -> [tags] -> [users]
+
+Cluster 8 'teams':
+  [users, projects] -> [teams]
 ```
-
-### STEP 3 : Build Layers (Trace complète)
-
-#### Relation 1 : users → profiles
-- **Cas 1** : Ni users ni profiles n'existent
-- Action : `layer[users] = 0`, `layer[profiles] = 1`
-- **Résultat** : `Layer 0: [users] | Layer 1: [profiles]`
-
-#### Relation 2 : posts → users
-- **Cas 2** : Seulement users existe (layer 0)
-- Action :
-  - target_layer = 0 - 1 = -1
-  - Aucun conflit au layer -1 (vide)
-  - `layer[posts] = -1`
-  - **Normalisation** : min = -1, shift = 1
-  - `layer[posts] = 0`, `layer[users] = 1`, `layer[profiles] = 2`
-- **Résultat** : `Layer 0: [posts] | Layer 1: [users] | Layer 2: [profiles]`
-
-#### Relation 3 : users → teams
-- **Cas 3** : Seulement users existe (layer 1)
-- Action :
-  - target_layer = 1 + 1 = 2
-  - Layer 2 contient profiles
-  - profiles connecté à users ? OUI (relation 1)
-  - **Conflit** → incrémenter : target_layer = 3
-  - Layer 3 vide → aucun conflit
-  - `layer[teams] = 3`
-  - Mais profiles et teams peuvent cohabiter (pas connectés)
-  - Réajustement : `layer[teams] = 2` (pas de conflit avec profiles)
-- **Résultat** : `Layer 0: [posts] | Layer 1: [users] | Layer 2: [profiles, teams]`
-
-#### Relation 4 : tags → users
-- **Cas 2** : Seulement users existe (layer 1)
-- Action :
-  - target_layer = 1 - 1 = 0
-  - Layer 0 contient posts
-  - posts connecté à tags ? NON
-  - `layer[tags] = 0`
-- **Résultat** : `Layer 0: [posts, tags] | Layer 1: [users] | Layer 2: [profiles, teams]`
-
-#### Relation 5 : user_roles → users
-- **Cas 2** : Seulement users existe (layer 1)
-- Action :
-  - target_layer = 0
-  - posts et tags connectés à user_roles ? NON
-  - `layer[user_roles] = 0`
-- **Résultat** : `Layer 0: [posts, tags, user_roles] | Layer 1: [users] | Layer 2: [profiles, teams]`
-
-#### Relation 6 : comments → posts
-- **Cas 2** : Seulement posts existe (layer 0)
-- Action :
-  - target_layer = -1
-  - Aucun conflit
-  - `layer[comments] = -1`
-  - **Normalisation** : shift = 1
-- **Résultat** : `Layer 0: [comments] | Layer 1: [posts, tags, user_roles] | Layer 2: [users] | Layer 3: [profiles, teams]`
-
-#### Relation 7 : post_tags → posts
-- **Cas 2** : Seulement posts existe (layer 1)
-- Action :
-  - target_layer = 0
-  - comments connecté à post_tags ? NON
-  - `layer[post_tags] = 0`
-- **Résultat** : `Layer 0: [comments, post_tags] | Layer 1: [posts, tags, user_roles] | Layer 2: [users] | Layer 3: [profiles, teams]`
-
-#### Relation 8 : post_tags → tags
-- **Cas 4** : Les deux existent (post_tags=0, tags=1)
-- Action : layer[post_tags] < layer[tags] → OK, aucun changement
-- **Résultat** : `Layer 0: [comments, post_tags] | Layer 1: [posts, tags, user_roles] | Layer 2: [users] | Layer 3: [profiles, teams]`
-
-#### Relation 9 : user_roles → roles
-- **Cas 3** : Seulement user_roles existe (layer 1)
-- Action :
-  - target_layer = 2
-  - users connecté à roles ? NON
-  - `layer[roles] = 2`
-- **Résultat** : `Layer 0: [comments, post_tags] | Layer 1: [posts, tags, user_roles] | Layer 2: [users, roles] | Layer 3: [profiles, teams]`
-
-#### Relation 10 : role_permissions → roles
-- **Cas 2** : Seulement roles existe (layer 2)
-- Action :
-  - target_layer = 1
-  - posts, tags, user_roles connectés à role_permissions ? NON
-  - `layer[role_permissions] = 1`
-- **Résultat** : `Layer 0: [comments, post_tags] | Layer 1: [posts, tags, user_roles, role_permissions] | Layer 2: [users, roles] | Layer 3: [profiles, teams]`
-
-#### Relation 11 : role_permissions → permissions
-- **Cas 3** : Seulement role_permissions existe (layer 1)
-- Action :
-  - target_layer = 2
-  - users, roles connectés à permissions ? NON
-  - `layer[permissions] = 2`
-- **Résultat FINAL** :
-  ```
-  Layer 0: [comments, post_tags]
-  Layer 1: [posts, tags, user_roles, role_permissions]
-  Layer 2: [users, roles, permissions]
-  Layer 3: [profiles, teams]
-  ```
 
 ---
 
-## Gestion des Cas Spéciaux
+## Step 4: Build Layers from Clusters
 
-### Entités Isolées
-Les entités sans connexion sont placées dans le layer le plus à droite (max layer + 1).
+**Purpose:** Integrate clusters into unified layer structure
 
-### Dépendances Circulaires
-L'algorithme **ne plante pas** sur les cycles. Il place les entités selon l'ordre de traitement, ce qui peut créer des layers qui ne respectent pas parfaitement toutes les contraintes.
+**Algorithm:**
+For each cluster:
+1. **First cluster:** Create initial layers
+2. **Find anchor:** Check if cluster entity exists in current layers
+   - Search RIGHT entities first, then LEFT
+3. **Anchor in RIGHT:** Remove cluster entities, insert LEFT before anchor
+4. **Anchor in LEFT:** Add non-pivot LEFT to anchor layer, insert RIGHT after
+5. **No anchor:** Insert at beginning
 
-**Exemple de cycle** :
+**Pivot:** Entity already in layers (appears in multiple clusters)
+
+**Evolution:**
+
 ```
-A → B → C → A
-```
+Iteration 1 (users):
+  Layer 0: [posts, tags, user_roles, user_projects, comments]
+  Layer 1: [users]
 
-L'algorithme va traiter dans l'ordre et placer les entités. Le cycle sera détecté mais géré gracieusement.
+Iteration 2 (posts) - Anchor: posts in RIGHT at layer 0:
+  Layer 0: [comments, post_tags, attachments, projects]
+  Layer 1: [posts, tags, user_roles, user_projects]
+  Layer 2: [users]
 
-### Conflits Bidirectionnels
+Iteration 3 (projects) - Anchor: projects in RIGHT at layer 0:
+  Layer 0: [milestones, user_projects]
+  Layer 1: [comments, post_tags, attachments, projects]
+  Layer 2: [posts, tags, user_roles]
+  Layer 3: [users]
 
-**Cas 1** : Même relation écrite deux fois
-```
-A > B
-B < A
-```
-→ Les deux seront traitées séparément (duplication)
+Iteration 4 (roles) - Anchor: user_roles in LEFT at layer 2:
+  Layer 0: [milestones, user_projects]
+  Layer 1: [comments, post_tags, attachments, projects]
+  Layer 2: [posts, tags, user_roles, role_permissions, notifications]
+  Layer 3: [roles]
+  Layer 4: [users]
 
-**Cas 2** : Cycle triangulaire
+Iteration 8 (teams) - Final:
+  Layer 0: [milestones, user_projects]
+  Layer 1: [comments, attachments, projects]
+  Layer 2: [post_tags]
+  Layer 3: [posts, tags, user_roles, role_permissions, notifications]
+  Layer 4: [permissions]
+  Layer 5: [roles]
+  Layer 6: [users]
+  Layer 7: [teams]
+  Layer 8: [profiles]
 ```
-A > B
-B > C
-C > A
-```
-→ Impossible à résoudre parfaitement. L'algorithme placera selon l'ordre de traitement.
 
 ---
 
-## Complexité
+## Step 5: Optimize Layers
 
-- **STEP 1** : O(n) où n = nombre de relations
-- **STEP 2** : O(n × m) où m = nombre d'entités (tri répété)
-- **STEP 3** : O(n × m × k) où k = nombre moyen d'entités par layer (vérification des conflits)
+**Purpose:** Reduce vertical space by merging compatible layers
 
-**Complexité totale** : O(n × m × k)
+**Algorithm:**
+1. Check each adjacent layer pair
+2. Merge if NO relationships exist between layers
+3. Repeat until no more merges possible
 
-Pour des graphes typiques (m ≈ n), cela reste raisonnable.
+**Result:**
 
----
+```
+Before (9 layers):
+  Layer 0: [milestones, user_projects]
+  Layer 1: [comments, attachments, projects]
+  Layer 2: [post_tags]
+  Layer 3: [posts, tags, user_roles, role_permissions, notifications]
+  Layer 4: [permissions]
+  Layer 5: [roles]
+  Layer 6: [users]
+  Layer 7: [teams]
+  Layer 8: [profiles]
 
-## Comparaison avec l'Algorithme Hiérarchique
-
-| Critère | Connection-Based | Hierarchical |
-|---------|------------------|--------------|
-| **Principe** | Connexions en priorité | Dépendances strictes |
-| **Direction** | Position Rule (ordre d'écriture) | Champs (id vs foreign key) |
-| **Cycles** | Gère gracieusement | Peut créer des problèmes |
-| **Résultat** | Plus compact (entités proches) | Plus étalé (hiérarchie stricte) |
-| **Use Case** | Schémas complexes avec beaucoup de connexions | Schémas strictement hiérarchiques |
-
----
-
-## Implémentation
-
-### TypeScript
-`src/infrastructure/layout/ConnectionBasedLayoutEngine.ts`
-
-### Python (Prototype)
-`python_test/algo.py`
-
-### Tests
-`src/infrastructure/layout/ConnectionBasedLayoutEngine.test.ts`
-
-**9 suites de tests** couvrant tous les cas d'usage.
+After (5 layers):
+  Layer 0: [milestones, user_projects]
+  Layer 1: [comments, attachments, projects, post_tags]
+  Layer 2: [posts, tags, user_roles, role_permissions, notifications]
+  Layer 3: [permissions, roles, users]
+  Layer 4: [teams, profiles]
+```
 
 ---
 
-## Conclusion
+## Step 6: Reorder Elements Within Layers
 
-L'algorithme **Connection-Based Layout** est conçu pour :
-- ✅ Gérer des schémas complexes avec de nombreuses connexions
-- ✅ Respecter l'ordre d'écriture de l'utilisateur (Position Rule)
-- ✅ Minimiser les distances entre entités connectées
-- ✅ Gérer gracieusement les cycles et conflits
-- ✅ Produire des layouts compacts et lisibles
+**Purpose:** Finalize vertical ordering using cluster alignment
+
+**This is where clusters deliver VERTICAL organization:**
+
+The cluster structure built in Step 3 now determines the final vertical stacking order within each layer. Entities in the same cluster are grouped together vertically.
+
+**Algorithm:**
+1. **Last layer:** Order by cluster processing order
+2. **Other layers (bottom to top):**
+   - Identify clusters in this layer (from Step 3)
+   - Order clusters by next layer's entity order
+   - Identify pivots (entities belonging to multiple clusters)
+   - Place non-pivots first, then pivots between their clusters
+
+**Why this works:**
+- Clusters group related entities → They should stack together vertically
+- Next layer's order influences this layer's order → Minimizes edge crossings
+- Pivots connect multiple clusters → Placed strategically between them
+
+**Result:**
+
+```
+Layer 4: [teams, profiles] → [profiles, teams]
+Layer 3: [permissions, roles, users] → [users, roles, permissions]
+Layer 2: [posts, tags, user_roles, role_permissions, notifications]
+      → [posts, tags, user_roles, notifications, role_permissions]
+Layer 1: No change
+Layer 0: No change
+```
+
+---
+
+## Final Output
+
+```
+Layer 0: [milestones, user_projects]
+Layer 1: [comments, attachments, projects, post_tags]
+Layer 2: [posts, tags, user_roles, notifications, role_permissions]
+Layer 3: [users, roles, permissions]
+Layer 4: [profiles, teams]
+```
+
+**Visual Layout (2D):**
+
+```
+Horizontal (Layers):  Layer 0 → Layer 1 → Layer 2 → Layer 3 → Layer 4
+                      Left                                      Right
+
+Vertical (Stacking):
+
+milestones          comments         posts           users         profiles
+user_projects       attachments      tags            roles         teams
+                    projects         user_roles      permissions
+                    post_tags        notifications
+                                     role_permissions
+
+                    ↑                ↑
+              Cluster-based    Cluster-based
+              vertical         vertical
+              grouping         grouping
+```
+
+**How Clusters Created This Layout:**
+- **Layer 0:** `milestones` and `user_projects` clustered around `projects`
+- **Layer 1:** Four entities clustered around different targets (`posts`, `projects`, `tags`)
+- **Layer 2:** Five entities from multiple clusters (users, posts, roles, permissions clusters)
+- **Layer 3:** Three entities clustered together (roles, permissions dependencies)
+- **Layer 4:** Two entities from different clusters (`users`, `projects`)
+
+---
+
+## Implementation Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ DSLParserAdapter (Parsing Layer)                            │
+│   parseDSL(dslText) → { entities[], relationships[] }       │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ ConnectionBasedLayoutEngine (Layout Layer)                  │
+│                                                              │
+│   Step 1: convertToDirectedRelations()                      │
+│   Step 2: orderRelationsByEntity()                          │
+│   Step 3: buildClusters()                                   │
+│   Step 4: buildLayersFromClusters()                         │
+│   Step 5: optimizeLayers()                                  │
+│   Step 6: reorderLayersByCluster()                          │
+│                                                              │
+│   Output: { layers, layerOf }                               │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ CanvasRendererAdapter (Rendering Layer)                     │
+│   - MagneticAlignmentOptimizer (field alignment)            │
+│   - LayoutPositioner (position calculation)                 │
+│   - Canvas rendering                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Key Principles
+
+1. **Clusters Enable 2D Organization:** The core innovation
+   - **Horizontal (Layers):** Clusters define which entities go left vs right
+   - **Vertical (Stacking):** Clusters define which entities group together top to bottom
+   - Without clusters: Only 1D ordering possible
+   - With clusters: Full 2D layout optimization
+
+2. **Separation of Concerns:** Layout doesn't parse DSL
+   - DSLParserAdapter: Handles parsing
+   - ConnectionBasedLayoutEngine: Handles classification
+   - CanvasRendererAdapter: Handles rendering
+
+3. **Dependency Flow:** Left entities depend on right entities
+   - Reading direction: Left → Right
+   - Data flow: Dependencies → Dependents
+
+4. **Iterative Refinement:** Build → Optimize → Reorder
+   - Step 3: Build clusters (2D structure)
+   - Step 4: Integrate clusters into layers (horizontal)
+   - Step 5: Optimize layer count
+   - Step 6: Finalize vertical ordering (vertical)
+
+5. **Pivot Handling:** Shared entities maintain multiple cluster relationships
+   - Pivots belong to multiple clusters
+   - Special placement between clusters
+
+6. **Edge Minimization:** Cluster-based ordering reduces visual crossings
+   - Related entities stack together
+   - Reduces connection line crossings
+
+---
+
+## Time Complexity
+
+- **Step 1:** O(R) where R = relationships
+- **Step 2:** O(R²) worst case
+- **Step 3:** O(R × E) where E = entities
+- **Step 4:** O(C × L × E) where C = clusters, L = layers
+- **Step 5:** O(L² × R)
+- **Step 6:** O(L × E²)
+
+**Overall:** O(R² + E²) - excellent for typical diagrams (< 1000 entities)
