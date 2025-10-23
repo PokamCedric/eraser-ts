@@ -217,17 +217,17 @@ print(f"  Liste énoncés: {liste_enonces}")
 # ITERATIONS 2, 3, ...
 iteration = 2
 while len(entity_order) < len(liste_regle_1):
-    print("\n" + "-"*60)
-    print(f"ITERATION {iteration}")
+    # print("\n" + "-"*60)
+    # print(f"ITERATION {iteration}")
 
     # Filtrer les candidats: éléments dans liste_enonces qui ne sont pas déjà choisis
     candidates = [e for e in liste_enonces if e not in entity_order]
 
-    if not candidates:
-        print("  Aucun candidat disponible, arrêt")
-        break
+    # if not candidates:
+    #     print("  Aucun candidat disponible, arrêt")
+    #     break
 
-    print(f"  Candidats: {candidates}")
+    # print(f"  Candidats: {candidates}")
 
     # Parmi les candidats, choisir celui avec le plus de connexions
     # En cas d'égalité, prendre celui qui vient en premier dans liste_regle_1
@@ -235,7 +235,7 @@ while len(entity_order) < len(liste_regle_1):
                       key=lambda e: (connection_count[e],
                                     -liste_regle_1.index(e)))
 
-    print(f"  Choix: {next_entity} (connexions={connection_count[next_entity]})")
+    # print(f"  Choix: {next_entity} (connexions={connection_count[next_entity]})")
     entity_order.append(next_entity)
 
     # Mettre à jour liste_enonces avec les nouvelles connexions
@@ -248,9 +248,9 @@ while len(entity_order) < len(liste_regle_1):
             liste_enonces.append(a)
             new_enonces.append(a)
 
-    if new_enonces:
-        print(f"  Nouveaux énoncés: {new_enonces}")
-    print(f"  Liste énoncés: {liste_enonces}")
+    # if new_enonces:
+    #     print(f"  Nouveaux énoncés: {new_enonces}")
+    # print(f"  Liste énoncés: {liste_enonces}")
 
     iteration += 1
 
@@ -260,9 +260,9 @@ print(f"  {' > '.join(entity_order)}")
 
 
 # === ÉTAPE 3 : CONSTRUCTION DES CLUSTERS ===
-print("\n" + "="*80)
-print("ÉTAPE 3 : CONSTRUCTION DES CLUSTERS")
-print("="*80)
+# print("\n" + "="*80)
+# print("ÉTAPE 3 : CONSTRUCTION DES CLUSTERS")
+# print("="*80)
 
 clusters = {}
 
@@ -281,8 +281,8 @@ for entity_name in entity_order:
         'right': cluster_right
     }
 
-    print(f"\nCluster '{entity_name}':")
-    print(f"  {cluster_left} > {cluster_right}")
+    # print(f"\nCluster '{entity_name}':")
+    # print(f"  {cluster_left} > {cluster_right}")
 
 
 # === ÉTAPE 4 : BUILD LAYERS ===
@@ -433,6 +433,7 @@ for iteration_num, entity_name in enumerate(entity_order, 1):
         must_reorganize = False
         conflict_parents = []
         unplaced_parents = []
+        pull_from_parents = []  # Parents qui "tirent" l'enfant vers la droite (CASE 2)
 
         for parent in cluster_left:
             parent_layer = find_layer_index(parent)
@@ -441,15 +442,24 @@ for iteration_num, entity_name in enumerate(entity_order, 1):
                 unplaced_parents.append(parent)
                 print(f"  [!] Parent non placé: '{parent}'")
             elif parent_layer >= entity_layer:
-                # Parent en conflit de position
+                # Parent en conflit de position (parent à droite ou même position)
                 must_reorganize = True
                 conflict_parents.append(parent)
                 print(f"  [!] CONFLIT! Parent '{parent}' (Layer {parent_layer}) >= Entity (Layer {entity_layer})")
+            elif parent_layer < entity_layer:
+                # CASE 2: Parent a gauche de l'enfant -> le parent "tire" l'enfant vers sa droite
+                pull_from_parents.append((parent, parent_layer))
+                print(f"  [!] CASE 2: Parent '{parent}' (Layer {parent_layer}) < Entity (Layer {entity_layer}) -> va tirer entity vers sa droite")
 
         # Si on a des parents non placés, on doit réorganiser
         if unplaced_parents:
             must_reorganize = True
             print(f"  [!] Réorganisation nécessaire à cause des parents non placés: {unplaced_parents}")
+
+        # Si on a des parents qui tirent (CASE 2), on doit aussi réorganiser
+        if pull_from_parents:
+            must_reorganize = True
+            print(f"  [!] Réorganisation nécessaire pour CASE 2: les parents tirent l'enfant")
 
         if not must_reorganize:
             print(f"  [OK] Pas de conflit, pas de réorganisation nécessaire")
@@ -464,10 +474,28 @@ for iteration_num, entity_name in enumerate(entity_order, 1):
         descendants = get_all_descendants(entity_name)
         print(f"  Descendants à supprimer: {descendants}")
 
-        # 2. Supprimer RIGHT et tous ses descendants
+        # 2. Identifier les éléments de clusters à regrouper (RÈGLE R2)
+        # Ce sont les éléments qui pointaient vers les descendants mais qui ne sont pas dans cluster_left
+        elements_to_regroup = []
+        for desc in descendants:
+            # Trouver le cluster de ce descendant
+            if desc in clusters:
+                desc_cluster_left = clusters[desc]['left']
+                for elem in desc_cluster_left:
+                    # Si l'élément n'est pas un parent du cluster actuel et est encore placé
+                    if elem not in cluster_left and find_layer_index(elem) is not None:
+                        if elem not in elements_to_regroup and elem != entity_name:
+                            elements_to_regroup.append(elem)
+                            print(f"  Élément de cluster à regrouper: {elem} (du cluster-{desc})")
+
+        # 3. Supprimer RIGHT et tous ses descendants
         remove_from_layers(entity_name)
         for desc in descendants:
             remove_from_layers(desc)
+
+        # 4. Supprimer aussi les éléments à regrouper (ils seront replacés)
+        for elem in elements_to_regroup:
+            remove_from_layers(elem)
 
         # 3. Placer les entités de LEFT (si elles ne sont pas déjà placées)
         for left_entity in cluster_left:
@@ -508,6 +536,25 @@ for iteration_num, entity_name in enumerate(entity_order, 1):
             layers.append([entity_name])
             right_placed_layer = len(layers) - 1
             print(f"  Nouveau Layer {right_placed_layer} créé pour {entity_name}")
+
+        # 5b. RÈGLE R2: Regrouper les éléments de cluster avec entity_name
+        # Les éléments à regrouper doivent être placés au même layer que entity_name si possible
+        for elem in elements_to_regroup:
+            if can_add_to_layer(elem, right_placed_layer):
+                layers[right_placed_layer].append(elem)
+                print(f"  Regroupement R2: {elem} ajouté au Layer {right_placed_layer} (avec {entity_name})")
+            else:
+                # Sinon, le placer dans un layer compatible
+                placed = False
+                for layer_idx in range(len(layers)):
+                    if can_add_to_layer(elem, layer_idx):
+                        layers[layer_idx].append(elem)
+                        print(f"  Regroupement R2: {elem} ajouté au Layer {layer_idx} (incompatible avec {entity_name})")
+                        placed = True
+                        break
+                if not placed:
+                    layers.append([elem])
+                    print(f"  Regroupement R2: Nouveau Layer {len(layers)-1} créé pour {elem}")
 
         # 6. Replacer les descendants en cascade
         if descendants:
@@ -602,7 +649,122 @@ for iteration_num, entity_name in enumerate(entity_order, 1):
 layers = [layer for layer in layers if layer]
 
 print("\n" + "="*80)
-print("RÉSULTAT FINAL")
+print("LAYERS APRÈS ÉTAPE 4 (avant réorganisation verticale)")
 print("="*80)
 for idx, layer in enumerate(layers):
     print(f"Layer {idx}: {layer}")
+
+
+# === ÉTAPE 6 : REORDER ELEMENTS WITHIN LAYERS ===
+print("\n" + "="*80)
+print("ÉTAPE 6 : RÉORGANISATION VERTICALE PAR CLUSTER")
+print("="*80)
+
+def reorder_layers_by_cluster():
+    """
+    Réorganise les entités dans chaque layer selon l'organisation en clusters.
+
+    LA CLÉ: Grouper les entités qui appartiennent au MÊME cluster
+    (qui pointent vers la même entité dans le layer suivant)
+
+    Algorithme:
+    1. Dernier layer: ordre selon entity_order
+    2. Autres layers (de droite à gauche):
+       - Pour chaque entité du layer suivant (dans l'ordre):
+         - Grouper toutes les entités du layer actuel qui pointent vers elle (même cluster)
+       - Les entités sans connexion au layer suivant viennent en premier
+    """
+    global layers
+
+    if not layers:
+        return
+
+    # Layer le plus à droite: ordonner selon entity_order
+    last_layer_idx = len(layers) - 1
+    last_layer = layers[last_layer_idx]
+
+    # Ordonner selon entity_order
+    ordered_last = []
+    for entity in entity_order:
+        if entity in last_layer:
+            ordered_last.append(entity)
+
+    # Ajouter les entités non dans entity_order (ne devrait pas arriver)
+    for entity in last_layer:
+        if entity not in ordered_last:
+            ordered_last.append(entity)
+
+    layers[last_layer_idx] = ordered_last
+    print(f"\nLayer {last_layer_idx}: {last_layer} -> {ordered_last}")
+
+    # Traiter les autres layers de droite à gauche
+    for layer_idx in range(len(layers) - 2, -1, -1):
+        current_layer = layers[layer_idx]
+        next_layer = layers[layer_idx + 1]
+
+        print(f"\nLayer {layer_idx}: {current_layer}")
+
+        # Trouver TOUTES les cibles pour chaque entité
+        entity_to_all_targets = {}
+        for entity in current_layer:
+            targets = []
+            for a, b in relations:
+                if a == entity and b in next_layer:
+                    targets.append(b)
+            entity_to_all_targets[entity] = targets
+
+        print(f"   Connexions multiples: {entity_to_all_targets}")
+
+        # Ordonner par la position MAXIMALE de leurs cibles
+        # Entités pointant vers des cibles plus tôt viennent avant les entités pointant vers des cibles plus tard
+
+        # 1. Calculer pour chaque entité la position max de ses cibles
+        entity_max_target_pos = {}
+        for entity in current_layer:
+            targets = entity_to_all_targets[entity]
+            if not targets:
+                entity_max_target_pos[entity] = -1  # Pas de cible = vient en premier
+            else:
+                max_pos = max(next_layer.index(t) for t in targets)
+                entity_max_target_pos[entity] = max_pos
+
+        print(f"   Max target positions: {entity_max_target_pos}")
+
+        # 2. Trier les entités par position maximale de cible
+        ordered_layer = sorted(current_layer, key=lambda e: (
+            entity_max_target_pos[e],
+            entity_order.index(e) if e in entity_order else 999
+        ))
+
+        # Log clusters for debugging
+        for target_entity in next_layer:
+            entities_pointing_to_target = [e for e in current_layer
+                                          if target_entity in entity_to_all_targets[e]]
+            if entities_pointing_to_target:
+                print(f"   Cluster -> {target_entity}: {entities_pointing_to_target}")
+
+        layers[layer_idx] = ordered_layer
+        print(f"   => {ordered_layer}")
+
+reorder_layers_by_cluster()
+
+print("\n" + "="*80)
+print("RÉSULTAT FINAL AVEC ORGANISATION VERTICALE")
+print("="*80)
+for idx, layer in enumerate(layers):
+    print(f"Layer {idx}: {layer}")
+
+print("\n" + "="*80)
+print("VISUALISATION 2D")
+print("="*80)
+if layers:
+    max_entities = max(len(layer) for layer in layers)
+    for row in range(max_entities):
+        line = ""
+        for layer in layers:
+            if row < len(layer):
+                entity = layer[row]
+                line += f"{entity:20}"
+            else:
+                line += " " * 20
+        print(line)
