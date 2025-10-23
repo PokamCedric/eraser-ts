@@ -5,8 +5,9 @@ Based on algo3.py with cluster-based vertical organization
 
 from collections import defaultdict
 
+
 # === DONNÉES DE TEST ===
-relations_input = """
+relations_input_1 = """
 users -> teams
 workspaces -> folders
 workspaces -> teams
@@ -29,18 +30,99 @@ cart_items -> products
 users -> addresses
 """
 
+relations_input_2 = """
+workspaces.teamId > teams.id
+chat.workspaceId > workspaces.id
+invite.workspaceId > workspaces.id
+invite.inviterId > users.id
+users.id < orders.userId
+orders.id > order_items.orderId
+order_items.productId > products.id
+products.categoryId > categories.id
+users.id > reviews.userId
+products.id > reviews.productId
+orders.paymentId > payments.id
+users.id > payments.userId
+orders.id > payments.orderId
+orders.shipmentId > shipments.id
+shipments.addressId > addresses.id
+users.id > carts.userId
+carts.id > cart_items.cartId
+cart_items.productId > products.id
+users.id > addresses.userId
+orders.id > shipments.orderId
+users.addressId > addresses.id
+"""
+
+relations_input_3 = """
+users.profileId - profiles.id
+posts.authorId > users.id
+users.id > teams.id
+comments.postId > posts.id
+tags.userId > users.id
+post_tags.postId > posts.id
+post_tags.tagId > tags.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+projects.teamId > teams.id
+milestones.projectId > projects.id
+attachments.postId > posts.id
+notifications.userId > roles.id
+user_projects.userId > users.id
+user_projects.projectId > projects.id
+projects.id < posts.authorId
+comments.userId > users.id
+"""
+
+relations_input = relations_input_1  # Nouveau DSL avec table.field
+
 # Parse relations
 relations = []
 for line in relations_input.strip().split('\n'):
-    if '->' in line:
-        parts = line.strip().split('->')
+    line = line.strip()
+    if not line:
+        continue
+
+    # Detect relation type and parse accordingly
+    # Priority matters: check <> first, then ->, then individual < or >, then -
+    # All relations: element on LEFT of the symbol stays on LEFT in the diagram
+
+    if '<>' in line:
+        # Many-to-many: A <> B means A is on left of B
+        parts = line.split('<>')
+        a = parts[0].strip()
+        b = parts[1].strip()
+        relations.append((a, b))
+    elif '->' in line:
+        # One-to-many: A -> B means A is on left of B
+        parts = line.split('->')
+        a = parts[0].strip()
+        b = parts[1].strip()
+        relations.append((a, b))
+    elif '>' in line:
+        # Many-to-one: A > B means A is on left of B
+        parts = line.split('>')
+        a = parts[0].strip()
+        b = parts[1].strip()
+        relations.append((a, b))
+    elif '<' in line:
+        # One-to-many: A < B means A is on left of B
+        parts = line.split('<')
+        a = parts[0].strip()
+        b = parts[1].strip()
+        relations.append((a, b))
+    elif '-' in line:
+        # One-to-one: A - B means A is on left of B
+        parts = line.split('-')
         a = parts[0].strip()
         b = parts[1].strip()
         relations.append((a, b))
 
 print("=== ÉTAPE 1 : RELATIONS DÉTECTÉES ===")
 for a, b in relations:
-    print(f"{a} -> {b}")
+    print(f"{a} > {b}")
 
 # === ÉTAPE 2 : ORDRE DES RELATIONS ===
 entity_order = ['users', 'orders', 'teams', 'workspaces', 'reviews', 'products',
@@ -48,7 +130,7 @@ entity_order = ['users', 'orders', 'teams', 'workspaces', 'reviews', 'products',
                 'cart_items', 'folders', 'categories']
 
 print("\n=== ÉTAPE 2 : ORDRE DES ENTITÉS ===")
-print(f"Ordre: {' -> '.join(entity_order)}")
+print(f"Ordre: {' > '.join(entity_order)}")
 
 # === ÉTAPE 3 : BUILD CLUSTERS ===
 print("\n=== ÉTAPE 3 : BUILD CLUSTERS ===\n")
@@ -70,7 +152,7 @@ for iteration, entity_name in enumerate(entity_order, 1):
     }
 
     print(f"{iteration}) Cluster '{entity_name}':")
-    print(f"   {cluster_left} -> {cluster_right}")
+    print(f"   {cluster_left} > {cluster_right}")
 
 # === ÉTAPE 4 : BUILD LAYERS ===
 print("\n=== ÉTAPE 4 : BUILD LAYERS ===\n")
@@ -131,7 +213,7 @@ for iteration, entity_name in enumerate(entity_order, 1):
     cluster_left = clusters[entity_name]['left']
     cluster_right = clusters[entity_name]['right']
 
-    print(f"cluster-{entity_name} -> {cluster_left} -> {cluster_right}")
+    print(f"cluster-{entity_name} > {cluster_left} > {cluster_right}")
     print()
 
     # Premier cluster
@@ -186,7 +268,31 @@ for iteration, entity_name in enumerate(entity_order, 1):
 
     if anchor_location == 'right':
         # RIGHT (entity_name) existe déjà
-        # Il faut déplacer RIGHT et tous ses enfants à droite de LEFT
+        # NOUVELLE LOGIQUE: Détecter les conflits de position
+
+        print(f"  entity_name '{entity_name}' already exists")
+
+        # Détecter les conflits
+        entity_layer = find_layer_index(entity_name)
+        must_reorganize = False
+        conflict_parents = []
+
+        for parent in cluster_left:
+            parent_layer = find_layer_index(parent)
+            if parent_layer is not None:
+                print(f"  Checking parent '{parent}' at Layer {parent_layer} vs entity at Layer {entity_layer}")
+                if parent_layer >= entity_layer:
+                    must_reorganize = True
+                    conflict_parents.append(parent)
+                    print(f"    [!] CONFLICT! Parent '{parent}' (Layer {parent_layer}) >= Entity (Layer {entity_layer})")
+
+        if not must_reorganize:
+            print(f"  [OK] No conflicts detected, skipping reorganization")
+        else:
+            print(f"  [REORGANIZING] due to conflicts with: {conflict_parents}")
+
+        # Si conflit ou si on doit toujours réorganiser (logique originale)
+        # On réorganise dans tous les cas pour le moment (pour compatibilité)
 
         # 1. Identifier tous les enfants (descendants) de RIGHT
         def get_children(parent):
@@ -219,6 +325,7 @@ for iteration, entity_name in enumerate(entity_order, 1):
 
         # 2. Supprimer RIGHT et tous ses descendants
         descendants = get_all_descendants(entity_name)
+        print(f"  Removing {entity_name} and descendants: {descendants}")
         remove_from_layers(entity_name)
         for desc in descendants:
             remove_from_layers(desc)
@@ -226,16 +333,19 @@ for iteration, entity_name in enumerate(entity_order, 1):
         # 3. Placer les entités de LEFT (si elles ne sont pas déjà placées)
         for left_entity in cluster_left:
             if find_layer_index(left_entity) is None:
+                print(f"  Placing unplaced parent: {left_entity}")
                 # Chercher un layer compatible
                 placed = False
                 for layer_idx in range(len(layers)):
                     if can_add_to_layer(left_entity, layer_idx):
                         layers[layer_idx].append(left_entity)
                         placed = True
+                        print(f"    -> Added to Layer {layer_idx}")
                         break
 
                 if not placed:
                     layers.append([left_entity])
+                    print(f"    -> Created new Layer {len(layers)-1}")
 
         # 4. Trouver le layer max des LEFT
         left_layers = [find_layer_index(e) for e in cluster_left if find_layer_index(e) is not None]
@@ -244,22 +354,27 @@ for iteration, entity_name in enumerate(entity_order, 1):
         else:
             max_left_layer = -1
 
+        print(f"  Max parent layer: {max_left_layer}")
+
         # 5. Placer RIGHT à droite du max LEFT
         right_placed_layer = None
         for layer_idx in range(max_left_layer + 1, len(layers)):
             if can_add_to_layer(entity_name, layer_idx):
                 layers[layer_idx].append(entity_name)
                 right_placed_layer = layer_idx
+                print(f"  Placed {entity_name} at Layer {layer_idx}")
                 break
 
         if right_placed_layer is None:
             layers.append([entity_name])
             right_placed_layer = len(layers) - 1
+            print(f"  Created new Layer {right_placed_layer} for {entity_name}")
 
         # 6. Replacer les descendants en cascade
         # Pour chaque descendant, le parent le déplace à sa droite
         # On traite par niveaux (BFS)
         if descendants:
+            print(f"  Cascading descendants: {descendants}")
             # Organiser par niveaux
             level_map = {entity_name: 0}
             queue = [entity_name]
@@ -289,7 +404,8 @@ for iteration, entity_name in enumerate(entity_order, 1):
                             break
 
                 if parent:
-                    move_entity_to_right_of_parent(parent, desc)
+                    new_layer = move_entity_to_right_of_parent(parent, desc)
+                    print(f"    Moved {desc} to Layer {new_layer} (right of {parent})")
 
     else:  # anchor_location == 'left'
         # LEFT existe déjà
@@ -367,7 +483,7 @@ def reorder_layers_by_cluster():
             ordered_last.append(entity)
 
     layers[last_layer_idx] = ordered_last
-    print(f"Layer {last_layer_idx}: {last_layer} -> {ordered_last}")
+    print(f"Layer {last_layer_idx}: {last_layer} > {ordered_last}")
 
     # Traiter les autres layers de droite à gauche
     for layer_idx in range(len(layers) - 2, -1, -1):
@@ -413,7 +529,7 @@ def reorder_layers_by_cluster():
             entities_pointing_to_target = [e for e in current_layer
                                           if target_entity in entity_to_all_targets[e]]
             if entities_pointing_to_target:
-                print(f"   Cluster -> {target_entity}: {entities_pointing_to_target}")
+                print(f"   Cluster > {target_entity}: {entities_pointing_to_target}")
 
         layers[layer_idx] = ordered_layer
         print(f"   => {ordered_layer}")
