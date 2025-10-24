@@ -1,6 +1,9 @@
 /**
- * Connection-Based Layout Engine - Clean Implementation
- * Based on algo4.py - Complete translation with all 6 steps
+ * Connection-Based Layout Engine V2 - Simplified Algorithm
+ * Based on algo5.py - Implementation of the 3 fundamental rules:
+ * 1. Minimum Distance: distance >= 1 (entities in relationship are never in same layer)
+ * 2. Optimal Placement: place entity at minimum valid layer
+ * 3. Direction rule: element on LEFT of symbol stays LEFT in diagram
  */
 
 import { Entity } from '../../domain/entities/Entity';
@@ -23,431 +26,482 @@ export interface ConnectionLayerResult {
 
 export class ConnectionBasedLayoutEngine {
   /**
-   * STEP 1: Convert parsed relationships to directed relations
+   * ÉTAPE 0: Parse relationships from domain entities to directed relations
+   * Reuse the parser from V1
    */
-  private static convertToDirectedRelations(relationships: Relationship[]): DirectedRelation[] {
+  private static parseRelations(relationships: Relationship[]): DirectedRelation[] {
     const relations: DirectedRelation[] = [];
 
-    console.log('\n=== ÉTAPE 1 : RELATIONS DÉTECTÉES ===');
+    console.log('\n=== ÉTAPE 0 : PARSER LES RELATIONS ===');
     for (const rel of relationships) {
       const left = rel.from.entity;
       const right = rel.to.entity;
 
       relations.push({ left, right });
-      console.log(`${left} -> ${right}`);
+      console.log(`  ${left} > ${right}`);
     }
 
+    console.log(`Relations parsées: ${relations.length}`);
     return relations;
   }
 
   /**
-   * STEP 2: Order entities - Simplified version from algo4.py
-   * This is hardcoded in algo4.py, so we'll use a simple approach:
-   * Process all relations and build entity order based on connectivity
+   * ÉTAPE 1: Constituer le backlog (LISTE 1)
+   * - Déduplication
+   * - Comptage des connexions
    */
-  private static orderEntities(relations: DirectedRelation[]): string[] {
-    console.log('\n=== ÉTAPE 2 : ORDRE DES ENTITÉS ===');
+  private static buildBacklog(relationsRaw: DirectedRelation[]): {
+    relations: DirectedRelation[];
+    connectionCount: Map<string, number>;
+  } {
+    console.log('\n' + '='.repeat(80));
+    console.log('ÉTAPE 1 : CONSTITUER LE BACKLOG');
+    console.log('='.repeat(80));
 
-    // Count connections per entity
-    const connections = new Map<string, number>();
-    for (const rel of relations) {
-      connections.set(rel.left, (connections.get(rel.left) || 0) + 1);
-      connections.set(rel.right, (connections.get(rel.right) || 0) + 1);
-    }
+    // Déduplication
+    const seenRelations = new Set<string>();
+    const uniqueRelations: DirectedRelation[] = [];
 
-    // Get all entities
-    const allEntities = new Set<string>();
-    for (const rel of relations) {
-      allEntities.add(rel.left);
-      allEntities.add(rel.right);
-    }
-
-    // Process entities: prioritize those that appear on RIGHT (are targets)
-    const processed = new Set<string>();
-    const entityOrder: string[] = [];
-    const remaining = [...relations];
-
-    while (remaining.length > 0) {
-      // Find entities that appear on RIGHT in remaining relations
-      const entitiesOnRight = new Set<string>();
-      for (const rel of remaining) {
-        entitiesOnRight.add(rel.right);
+    for (const { left, right } of relationsRaw) {
+      const relationKey = `${left}>${right}`;
+      if (!seenRelations.has(relationKey)) {
+        seenRelations.add(relationKey);
+        uniqueRelations.push({ left, right });
       }
+    }
 
-      // Choose entity with most connections among those on RIGHT
-      let chosenEntity: string | null = null;
-      let maxConnections = -1;
+    console.log(`Relations après déduplication: ${uniqueRelations.length}`);
 
-      for (const entity of entitiesOnRight) {
-        if (processed.has(entity)) continue;
-        const conn = connections.get(entity) || 0;
-        if (conn > maxConnections) {
-          maxConnections = conn;
-          chosenEntity = entity;
+    // Comptage des connexions
+    const connectionCount = new Map<string, number>();
+    for (const { left, right } of uniqueRelations) {
+      connectionCount.set(left, (connectionCount.get(left) || 0) + 1);
+      connectionCount.set(right, (connectionCount.get(right) || 0) + 1);
+    }
+
+    return { relations: uniqueRelations, connectionCount };
+  }
+
+  /**
+   * ÉTAPE 2: Déterminer l'ordre de traitement
+   * Utilise 3 critères:
+   * 1. Liste-Règle 1: triée par nombre de connexions décroissant
+   * 2. Connexion avec entités déjà choisies
+   * 3. Tie-breaker: position dans Liste-Règle 1
+   */
+  private static determineOrder(
+    relations: DirectedRelation[],
+    connectionCount: Map<string, number>
+  ): string[] {
+    console.log('\n' + '='.repeat(80));
+    console.log('ÉTAPE 2 : ORDRE DE TRAITEMENT');
+    console.log('='.repeat(80));
+
+    // Liste-Règle 1 (référence)
+    const listeRegle1 = Array.from(connectionCount.keys()).sort(
+      (a, b) => connectionCount.get(b)! - connectionCount.get(a)!
+    );
+
+    // Liste à remplir
+    const entityOrder: string[] = [];
+    const listeEnonces: string[] = [];
+
+    // ITERATION 1: Prendre le premier élément
+    entityOrder.push(listeRegle1[0]);
+
+    // Ajouter les entités connectées
+    for (const { left, right } of relations) {
+      if (left === entityOrder[0] && !listeEnonces.includes(right)) {
+        listeEnonces.push(right);
+      }
+      if (right === entityOrder[0] && !listeEnonces.includes(left)) {
+        listeEnonces.push(left);
+      }
+    }
+
+    // ITERATIONS suivantes
+    while (entityOrder.length < listeRegle1.length) {
+      const candidates = listeEnonces.filter(e => !entityOrder.includes(e));
+      if (candidates.length === 0) break;
+
+      // Choisir le candidat avec:
+      // 1. Plus grand nombre de connexions
+      // 2. Position la plus petite dans listeRegle1 (tie-breaker)
+      const nextEntity = candidates.reduce((best, current) => {
+        const currentConnections = connectionCount.get(current) || 0;
+        const bestConnections = connectionCount.get(best) || 0;
+
+        if (currentConnections > bestConnections) return current;
+        if (currentConnections < bestConnections) return best;
+
+        // Tie-breaker: position dans listeRegle1
+        return listeRegle1.indexOf(current) < listeRegle1.indexOf(best) ? current : best;
+      });
+
+      entityOrder.push(nextEntity);
+
+      // Mettre à jour liste_enonces
+      for (const { left, right } of relations) {
+        if (left === nextEntity && !listeEnonces.includes(right) && !entityOrder.includes(right)) {
+          listeEnonces.push(right);
+        }
+        if (right === nextEntity && !listeEnonces.includes(left) && !entityOrder.includes(left)) {
+          listeEnonces.push(left);
         }
       }
-
-      if (!chosenEntity) break;
-
-      entityOrder.push(chosenEntity);
-      processed.add(chosenEntity);
-
-      // Remove relations where chosen entity is on RIGHT
-      const toRemove = remaining.filter(rel => rel.right === chosenEntity);
-      for (const rel of toRemove) {
-        const idx = remaining.indexOf(rel);
-        if (idx !== -1) remaining.splice(idx, 1);
-      }
     }
 
-    console.log(`Ordre: ${entityOrder.join(' -> ')}`);
+    console.log(`Ordre: ${entityOrder.join(' > ')}`);
     return entityOrder;
   }
 
   /**
-   * STEP 3: Build clusters
+   * ÉTAPE 3: Construction des clusters
    */
   private static buildClusters(
     entityOrder: string[],
     relations: DirectedRelation[]
   ): Map<string, Cluster> {
-    console.log('\n=== ÉTAPE 3 : BUILD CLUSTERS ===\n');
-
     const clusters = new Map<string, Cluster>();
 
-    for (let i = 0; i < entityOrder.length; i++) {
-      const entityName = entityOrder[i];
-
-      // Construire le cluster
+    for (const entityName of entityOrder) {
       const clusterLeft: string[] = [];
-      const clusterRight = [entityName];
-
-      for (const rel of relations) {
-        if (rel.right === entityName && !clusterLeft.includes(rel.left)) {
-          clusterLeft.push(rel.left);
+      for (const { left, right } of relations) {
+        if (right === entityName && !clusterLeft.includes(left)) {
+          clusterLeft.push(left);
         }
       }
 
-      clusters.set(entityName, { left: clusterLeft, right: clusterRight });
-
-      console.log(`${i + 1}) Cluster '${entityName}':`);
-      console.log(`   ${JSON.stringify(clusterLeft)} -> ${JSON.stringify(clusterRight)}`);
+      clusters.set(entityName, {
+        left: clusterLeft,
+        right: [entityName],
+      });
     }
 
     return clusters;
   }
 
   /**
-   * STEP 4: Build layers with cascade movement
+   * Helper: Find layer index containing entity
+   */
+  private static findLayerIndex(layers: string[][], entity: string): number | null {
+    for (let i = 0; i < layers.length; i++) {
+      if (layers[i].includes(entity)) return i;
+    }
+    return null;
+  }
+
+  /**
+   * Helper: Check if entity can be added to layer (no conflicts)
+   */
+  private static canAddToLayer(
+    layers: string[][],
+    entity: string,
+    layerIdx: number,
+    relations: DirectedRelation[]
+  ): boolean {
+    if (layerIdx >= layers.length) return true;
+
+    for (const existing of layers[layerIdx]) {
+      for (const { left, right } of relations) {
+        if ((left === entity && right === existing) || (left === existing && right === entity)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Helper: Find all children (descendants) of an entity recursively
+   */
+  private static findAllChildren(entity: string, relations: DirectedRelation[]): string[] {
+    const children: string[] = [];
+    const visited = new Set<string>();
+
+    const recurse = (current: string) => {
+      if (visited.has(current)) return;
+      visited.add(current);
+
+      for (const { left, right } of relations) {
+        if (left === current && !children.includes(right)) {
+          children.push(right);
+          recurse(right);
+        }
+      }
+    };
+
+    recurse(entity);
+    return children;
+  }
+
+  /**
+   * Helper: Find all parents of an entity
+   */
+  private static findAllParents(entity: string, relations: DirectedRelation[]): string[] {
+    const parents: string[] = [];
+    for (const { left, right } of relations) {
+      if (right === entity && !parents.includes(left)) {
+        parents.push(left);
+      }
+    }
+    return parents;
+  }
+
+  /**
+   * ÉTAPE 4: Build Layers (VERSION SIMPLIFIÉE)
    */
   private static buildLayers(
     entityOrder: string[],
     clusters: Map<string, Cluster>,
     relations: DirectedRelation[]
   ): string[][] {
-    console.log('\n=== ÉTAPE 4 : BUILD LAYERS ===\n');
+    console.log('\n' + '='.repeat(80));
+    console.log('ÉTAPE 4 : BUILD LAYERS (SIMPLE)');
+    console.log('='.repeat(80));
 
     const layers: string[][] = [];
 
-    const findLayerIndex = (entity: string): number | null => {
-      for (let i = 0; i < layers.length; i++) {
-        if (layers[i].includes(entity)) return i;
-      }
-      return null;
-    };
-
-    const removeFromLayers = (entity: string): void => {
-      for (const layer of layers) {
-        const idx = layer.indexOf(entity);
-        if (idx !== -1) layer.splice(idx, 1);
-      }
-    };
-
-    const canAddToLayer = (entity: string, layerIdx: number): boolean => {
-      if (layerIdx >= layers.length) return true;
-
-      for (const existing of layers[layerIdx]) {
-        for (const rel of relations) {
-          if ((rel.left === entity && rel.right === existing) ||
-              (rel.left === existing && rel.right === entity)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    };
-
-    const moveEntityToRightOfParent = (parentEntity: string, childEntity: string): number | null => {
-      const parentLayer = findLayerIndex(parentEntity);
-      if (parentLayer === null) return null;
-
-      removeFromLayers(childEntity);
-
-      for (let layerIdx = parentLayer + 1; layerIdx < layers.length; layerIdx++) {
-        if (canAddToLayer(childEntity, layerIdx)) {
-          layers[layerIdx].push(childEntity);
-          return layerIdx;
-        }
-      }
-
-      layers.push([childEntity]);
-      return layers.length - 1;
-    };
-
-    // Traiter chaque entité
+    // Traiter chaque entité selon l'ordre
     for (let iteration = 0; iteration < entityOrder.length; iteration++) {
       const entityName = entityOrder[iteration];
       const cluster = clusters.get(entityName);
       if (!cluster) continue;
 
+      console.log(`\n${iteration + 1}) '${entityName}'`);
+      console.log(`   Cluster: ${JSON.stringify(cluster.left)} > ${JSON.stringify(cluster.right)}`);
+
       const clusterLeft = [...cluster.left];
-      const clusterRight = [...cluster.right];
 
-      console.log(`${iteration + 1}) Entité '${entityName}':`);
-      console.log(`cluster-${entityName} -> ${JSON.stringify(clusterLeft)} -> ${JSON.stringify(clusterRight)}`);
-      console.log();
+      // Trouver le layer maximum parmi les parents PLACÉS
+      let maxParentLayer = -1;
+      const unplacedParents: string[] = [];
 
-      // Premier cluster
-      if (layers.length === 0) {
-        if (clusterLeft.length > 0) {
-          layers.push([...clusterLeft]);
-        }
-        layers.push([...clusterRight]);
-        console.log('=>');
-        layers.forEach((layer, idx) => {
-          console.log(`Layer ${idx}: ${JSON.stringify(layer)}`);
-        });
-        console.log();
-        continue;
-      }
-
-      // Chercher une ancre
-      let anchor: string | null = null;
-      let anchorLocation: 'left' | 'right' | null = null;
-
-      // Chercher dans RIGHT
-      for (const e of clusterRight) {
-        const idx = findLayerIndex(e);
-        if (idx !== null) {
-          anchor = e;
-          anchorLocation = 'right';
-          break;
+      for (const parent of clusterLeft) {
+        const parentLayer = this.findLayerIndex(layers, parent);
+        if (parentLayer !== null) {
+          maxParentLayer = Math.max(maxParentLayer, parentLayer);
+          console.log(`   Parent '${parent}' en Layer ${parentLayer}`);
+        } else {
+          unplacedParents.push(parent);
         }
       }
 
-      // Chercher dans LEFT
-      if (anchor === null) {
-        for (const e of clusterLeft) {
-          const idx = findLayerIndex(e);
-          if (idx !== null) {
-            anchor = e;
-            anchorLocation = 'left';
-            break;
-          }
-        }
-      }
+      // Vérifier si l'entité est déjà placée
+      const entityAlreadyPlaced = this.findLayerIndex(layers, entityName) !== null;
 
-      // Pas d'ancre
-      if (anchor === null) {
-        const newLayers: string[][] = [];
-        if (clusterLeft.length > 0) {
-          newLayers.push([...clusterLeft]);
-        }
-        newLayers.push([...clusterRight]);
-        layers.unshift(...newLayers);
-        console.log('=>');
-        layers.forEach((layer, idx) => {
-          console.log(`Layer ${idx}: ${JSON.stringify(layer)}`);
-        });
-        console.log();
-        continue;
-      }
-
-      console.log();
-
-      if (anchorLocation === 'right') {
-        // RIGHT existe déjà - déplacer en cascade
-
-        const getChildren = (parent: string): string[] => {
-          const children: string[] = [];
-          for (const rel of relations) {
-            if (rel.left === parent) {
-              children.push(rel.right);
-            }
-          }
-          return children;
-        };
-
-        const getAllDescendants = (root: string): string[] => {
-          const descendants: string[] = [];
-          const visited = new Set<string>();
-          const queue = [root];
-
-          while (queue.length > 0) {
-            const current = queue.shift()!;
-            if (visited.has(current)) continue;
-            visited.add(current);
-
-            const children = getChildren(current);
-            for (const child of children) {
-              if (!descendants.includes(child)) {
-                descendants.push(child);
-                queue.push(child);
+      // Si l'entité est déjà placée MAIS on a des parents non placés, les placer quand même
+      if (entityAlreadyPlaced && unplacedParents.length > 0) {
+        // Placer les parents non placés selon la logique normale
+        for (const parent of unplacedParents) {
+          if (this.findLayerIndex(layers, parent) === null) {
+            // Calculer où ce parent devrait aller
+            let currentMaxParent = -1;
+            for (const placedParent of clusterLeft) {
+              const parentLayer = this.findLayerIndex(layers, placedParent);
+              if (parentLayer !== null) {
+                currentMaxParent = Math.max(currentMaxParent, parentLayer);
               }
             }
-          }
 
-          return descendants;
-        };
+            const entityTarget = currentMaxParent + 1;
+            const parentPreferred = entityTarget > 0 ? entityTarget - 1 : 0;
 
-        // Supprimer RIGHT et descendants
-        const descendants = getAllDescendants(entityName);
-        removeFromLayers(entityName);
-        for (const desc of descendants) {
-          removeFromLayers(desc);
-        }
-
-        // Placer LEFT
-        for (const leftEntity of clusterLeft) {
-          if (findLayerIndex(leftEntity) === null) {
-            let placed = false;
-            for (let layerIdx = 0; layerIdx < layers.length; layerIdx++) {
-              if (canAddToLayer(leftEntity, layerIdx)) {
-                layers[layerIdx].push(leftEntity);
-                placed = true;
+            // Chercher de parentPreferred vers la gauche (0)
+            let parentPlaced = false;
+            for (let layerIdx = parentPreferred; layerIdx >= 0; layerIdx--) {
+              if (this.canAddToLayer(layers, parent, layerIdx, relations)) {
+                if (layerIdx >= layers.length) {
+                  layers.push([parent]);
+                } else {
+                  layers[layerIdx].push(parent);
+                }
+                console.log(`      '${parent}' placé au Layer ${layerIdx}`);
+                maxParentLayer = Math.max(maxParentLayer, layerIdx);
+                parentPlaced = true;
                 break;
               }
             }
-            if (!placed) {
-              layers.push([leftEntity]);
+
+            // Si pas placé, insérer un nouveau layer à gauche
+            if (!parentPlaced) {
+              layers.unshift([parent]);
+              console.log(`      '${parent}' placé au nouveau Layer 0 (insertion à gauche)`);
+              maxParentLayer = maxParentLayer >= 0 ? maxParentLayer + 1 : 0;
             }
           }
         }
 
-        // Trouver layer max des LEFT
-        const leftLayers = clusterLeft
-          .map(e => findLayerIndex(e))
-          .filter(idx => idx !== null) as number[];
-        const maxLeftLayer = leftLayers.length > 0 ? Math.max(...leftLayers) : -1;
+        // Vérifier si l'entité doit être déplacée
+        const entityCurrentLayer = this.findLayerIndex(layers, entityName);
+        if (entityCurrentLayer === null) continue;
 
-        // Placer RIGHT
-        let rightPlacedLayer: number | null = null;
-        for (let layerIdx = maxLeftLayer + 1; layerIdx < layers.length; layerIdx++) {
-          if (canAddToLayer(entityName, layerIdx)) {
-            layers[layerIdx].push(entityName);
-            rightPlacedLayer = layerIdx;
-            break;
+        // Recalculer max_parent_layer après placement des parents non placés
+        let finalMaxParent = -1;
+        for (const parent of clusterLeft) {
+          const parentLayer = this.findLayerIndex(layers, parent);
+          if (parentLayer !== null) {
+            finalMaxParent = Math.max(finalMaxParent, parentLayer);
           }
         }
 
-        if (rightPlacedLayer === null) {
-          layers.push([entityName]);
-          rightPlacedLayer = layers.length - 1;
-        }
+        const requiredLayer = finalMaxParent + 1;
 
-        // Replacer descendants en cascade
-        if (descendants.length > 0) {
-          const levelMap = new Map<string, number>();
-          levelMap.set(entityName, 0);
-          const queue = [entityName];
+        if (entityCurrentLayer < requiredLayer) {
+          console.log(
+            `   -> '${entityName}' doit être déplacé de Layer ${entityCurrentLayer} vers Layer ${requiredLayer} (avec cascade)`
+          );
 
-          while (queue.length > 0) {
-            const current = queue.shift()!;
-            const currentLevel = levelMap.get(current)!;
-            const children = getChildren(current);
+          // Déplacer l'entité, ses descendants (enfants)
+          // ET les parents (cluster) de chaque descendant
+          // SAUF les parents de l'entité principale (qui doivent rester à gauche)
+          const allDescendants = this.findAllChildren(entityName, relations);
+          const entityParents = new Set(clusterLeft); // Parents de l'entité principale à exclure
 
-            for (const child of children) {
-              if (descendants.includes(child) && !levelMap.has(child)) {
-                levelMap.set(child, currentLevel + 1);
-                queue.push(child);
-              }
-            }
-          }
+          const entitiesToMoveSet = new Set<string>();
+          entitiesToMoveSet.add(entityName); // Commencer avec l'entité principale
 
-          const descendantsSorted = descendants.sort((a, b) => {
-            const levelA = levelMap.get(a) || 999;
-            const levelB = levelMap.get(b) || 999;
-            return levelA - levelB;
-          });
-
-          for (const desc of descendantsSorted) {
-            let parent: string | null = null;
-            for (const rel of relations) {
-              if (rel.right === desc && (rel.left === entityName || descendantsSorted.includes(rel.left))) {
-                const parentLayer = findLayerIndex(rel.left);
-                if (parentLayer !== null) {
-                  parent = rel.left;
-                  break;
+          // Pour chaque descendant, ajouter le descendant ET ses parents (sauf parents de l'entité principale)
+          for (const descendant of allDescendants) {
+            if (this.findLayerIndex(layers, descendant) !== null) {
+              entitiesToMoveSet.add(descendant);
+              // Ajouter les parents de ce descendant qui ne sont PAS parents de l'entité principale
+              for (const parent of this.findAllParents(descendant, relations)) {
+                if (this.findLayerIndex(layers, parent) !== null && !entityParents.has(parent)) {
+                  entitiesToMoveSet.add(parent);
                 }
               }
             }
+          }
 
-            if (parent) {
-              moveEntityToRightOfParent(parent, desc);
+          const entitiesToMove = Array.from(entitiesToMoveSet);
+
+          // Calculer le décalage nécessaire
+          const shift = requiredLayer - entityCurrentLayer;
+          console.log(`      Entites a deplacer en cascade (avec clusters): ${JSON.stringify(entitiesToMove)}`);
+          console.log(`      Decalage: +${shift} layers`);
+
+          // Déplacer toutes les entités concernées
+          for (const entityToMove of entitiesToMove) {
+            const currentPos = this.findLayerIndex(layers, entityToMove);
+            if (currentPos !== null) {
+              const newPos = currentPos + shift;
+
+              // Retirer de l'ancien layer
+              const idx = layers[currentPos].indexOf(entityToMove);
+              if (idx !== -1) {
+                layers[currentPos].splice(idx, 1);
+              }
+
+              // Ajouter au nouveau layer
+              while (layers.length <= newPos) {
+                layers.push([]);
+              }
+              layers[newPos].push(entityToMove);
+              console.log(`      '${entityToMove}' deplace: Layer ${currentPos} -> Layer ${newPos}`);
             }
           }
         }
+
+        // Continue pour afficher les layers
+      } else if (entityAlreadyPlaced) {
+        // Entity déjà placé et pas de parents à placer
+        console.log(`   -> Déjà placé, skip`);
+        continue;
       } else {
-        // anchor_location === 'left'
+        // Entity pas encore placé
+        // Si on a des parents non placés, on doit les placer d'abord (cluster complet)
+        if (unplacedParents.length > 0) {
+          console.log(`   -> Placement des parents non placés: ${JSON.stringify(unplacedParents)}`);
 
-        const pivots: string[] = [];
-        for (const e of clusterLeft) {
-          if (e !== anchor && findLayerIndex(e) !== null) {
-            pivots.push(e);
+          // Placer tous les parents non placés
+          for (const parent of unplacedParents) {
+            if (this.findLayerIndex(layers, parent) === null) {
+              const entityTarget = maxParentLayer + 1;
+              const parentPreferred = entityTarget > 0 ? entityTarget - 1 : 0;
+
+              // Chercher de parentPreferred vers la gauche
+              let parentPlaced = false;
+              for (let layerIdx = parentPreferred; layerIdx >= 0; layerIdx--) {
+                if (this.canAddToLayer(layers, parent, layerIdx, relations)) {
+                  if (layerIdx >= layers.length) {
+                    layers.push([parent]);
+                  } else {
+                    layers[layerIdx].push(parent);
+                  }
+                  console.log(`      '${parent}' placé au Layer ${layerIdx}`);
+                  maxParentLayer = Math.max(maxParentLayer, layerIdx);
+                  parentPlaced = true;
+                  break;
+                }
+              }
+
+              // Si pas placé (tous les layers ont conflit), insérer un nouveau layer à gauche
+              if (!parentPlaced) {
+                layers.unshift([parent]);
+                console.log(`      '${parent}' placé au nouveau Layer 0 (insertion à gauche)`);
+                maxParentLayer = maxParentLayer >= 0 ? maxParentLayer + 1 : 0;
+                maxParentLayer = Math.max(maxParentLayer, 0);
+              }
+            }
           }
         }
 
-        const anchorLayerIdx = findLayerIndex(anchor)!;
-        for (const e of clusterLeft) {
-          if (e !== anchor && !pivots.includes(e) && !layers[anchorLayerIdx].includes(e)) {
-            layers[anchorLayerIdx].push(e);
-          }
-        }
+        // Placer l'entité au minimum layer valide à droite du max parent
+        const targetLayer = maxParentLayer + 1;
 
-        let rightPlaced = false;
-        for (let layerIdx = anchorLayerIdx + 1; layerIdx < layers.length; layerIdx++) {
-          if (canAddToLayer(entityName, layerIdx)) {
-            layers[layerIdx].push(entityName);
-            rightPlaced = true;
+        // Chercher le premier layer compatible à partir de targetLayer
+        let placed = false;
+        for (let layerIdx = targetLayer; layerIdx <= layers.length; layerIdx++) {
+          if (this.canAddToLayer(layers, entityName, layerIdx, relations)) {
+            if (layerIdx >= layers.length) {
+              layers.push([entityName]);
+            } else {
+              layers[layerIdx].push(entityName);
+            }
+            placed = true;
+            console.log(`   -> '${entityName}' placé au Layer ${layerIdx}`);
             break;
           }
         }
 
-        if (!rightPlaced) {
+        if (!placed) {
+          // Ne devrait jamais arriver
           layers.push([entityName]);
+          console.log(`   -> Nouveau Layer ${layers.length - 1}`);
         }
       }
 
-      console.log('=>');
+      // Afficher les layers après placement
+      console.log(`\n   Layers après placement:`);
       layers.forEach((layer, idx) => {
-        console.log(`Layer ${idx}: ${JSON.stringify(layer)}`);
+        console.log(`     Layer ${idx}: ${JSON.stringify(layer)}`);
       });
-      console.log();
     }
 
-    // Nettoyer layers vides
+    // Nettoyer les layers vides
     return layers.filter(layer => layer.length > 0);
   }
 
   /**
-   * STEP 6: Reorder layers by cluster (vertical organization)
+   * ÉTAPE 6: Réorganisation verticale par cluster
    */
   private static reorderLayersByCluster(
     layers: string[][],
     entityOrder: string[],
     relations: DirectedRelation[]
   ): string[][] {
-    console.log('\n=== ÉTAPE 6 : RÉORGANISATION VERTICALE PAR CLUSTER ===\n');
+    console.log('\n' + '='.repeat(80));
+    console.log('ÉTAPE 6 : RÉORGANISATION VERTICALE');
+    console.log('='.repeat(80));
 
     if (layers.length === 0) return layers;
 
-    const reorderedLayers = layers.map(l => [...l]);
-
-    // Dernier layer: ordonner selon entityOrder
+    // Dernier layer: ordre selon entity_order
     const lastLayerIdx = layers.length - 1;
     const lastLayer = layers[lastLayerIdx];
-    const orderedLast: string[] = [];
 
+    const orderedLast: string[] = [];
     for (const entity of entityOrder) {
       if (lastLayer.includes(entity)) {
         orderedLast.push(entity);
@@ -460,52 +514,27 @@ export class ConnectionBasedLayoutEngine {
       }
     }
 
-    reorderedLayers[lastLayerIdx] = orderedLast;
-    console.log(`Layer ${lastLayerIdx}: ${JSON.stringify(lastLayer)} -> ${JSON.stringify(orderedLast)}`);
+    layers[lastLayerIdx] = orderedLast;
 
     // Autres layers de droite à gauche
     for (let layerIdx = layers.length - 2; layerIdx >= 0; layerIdx--) {
       const currentLayer = layers[layerIdx];
-      const nextLayer = reorderedLayers[layerIdx + 1];
+      const nextLayer = layers[layerIdx + 1];
 
-      console.log(`\nLayer ${layerIdx}: ${JSON.stringify(currentLayer)}`);
-
-      // Trouver vers quelle entité du layer suivant chaque entité pointe
-      const entityToTarget = new Map<string, string | null>();
-      for (const entity of currentLayer) {
-        let target: string | null = null;
-        for (const rel of relations) {
-          if (rel.left === entity && nextLayer.includes(rel.right)) {
-            target = rel.right;
-            break;
-          }
-        }
-        entityToTarget.set(entity, target);
-      }
-
-      console.log(`   Connexions: ${JSON.stringify(Object.fromEntries(entityToTarget))}`);
-
-      // NOUVELLE LOGIQUE: Trouver TOUTES les cibles pour chaque entité (pas seulement la première)
+      // Trouver TOUTES les cibles pour chaque entité
       const entityToAllTargets = new Map<string, string[]>();
       for (const entity of currentLayer) {
         const targets: string[] = [];
-        for (const rel of relations) {
-          if (rel.left === entity && nextLayer.includes(rel.right)) {
-            targets.push(rel.right);
+        for (const { left, right } of relations) {
+          if (left === entity && nextLayer.includes(right)) {
+            targets.push(right);
           }
         }
         entityToAllTargets.set(entity, targets);
       }
 
-      console.log(`   Connexions multiples:`, Object.fromEntries(
-        Array.from(entityToAllTargets.entries()).map(([e, ts]) => [e, ts.length > 0 ? ts : null])
-      ));
-
-      // NOUVELLE STRATÉGIE: Ordonner par la position MAXIMALE de leurs cibles
-      // Entités pointant vers des cibles plus tôt viennent avant les entités pointant vers des cibles plus tard
-      const orderedLayer: string[] = [];
-
-      // 1. Calculer pour chaque entité la position max de ses cibles
+      // Calculer pour chaque entité la position MAXIMALE de ses cibles
+      // Ceci permet de grouper les entités qui pointent vers les mêmes cibles
       const entityMaxTargetPos = new Map<string, number>();
       for (const entity of currentLayer) {
         const targets = entityToAllTargets.get(entity) || [];
@@ -517,18 +546,16 @@ export class ConnectionBasedLayoutEngine {
         }
       }
 
-      console.log(`   Max target positions:`, Object.fromEntries(entityMaxTargetPos));
+      // Trier les entités par position maximale de cible, puis par entity_order
+      const orderedLayer = currentLayer.slice().sort((a, b) => {
+        const maxPosA = entityMaxTargetPos.get(a) ?? -1;
+        const maxPosB = entityMaxTargetPos.get(b) ?? -1;
 
-      // 2. Trier les entités par position maximale de cible
-      const sortedEntities = [...currentLayer].sort((a, b) => {
-        const posA = entityMaxTargetPos.get(a) ?? 999;
-        const posB = entityMaxTargetPos.get(b) ?? 999;
-
-        if (posA !== posB) {
-          return posA - posB; // Position max plus petite = vient en premier
+        if (maxPosA !== maxPosB) {
+          return maxPosA - maxPosB;
         }
 
-        // Si même position max, utiliser entityOrder
+        // En cas d'égalité, trier par entity_order
         const indexA = entityOrder.indexOf(a);
         const indexB = entityOrder.indexOf(b);
         if (indexA === -1 && indexB === -1) return 0;
@@ -537,49 +564,37 @@ export class ConnectionBasedLayoutEngine {
         return indexA - indexB;
       });
 
-      orderedLayer.push(...sortedEntities);
-
-      // Log clusters for debugging
-      const clustersByTarget = new Map<string, string[]>();
-      for (const targetEntity of nextLayer) {
-        const entities = currentLayer.filter(e =>
-          (entityToAllTargets.get(e) || []).includes(targetEntity)
-        );
-        if (entities.length > 0) {
-          clustersByTarget.set(targetEntity, entities);
-        }
-      }
-      for (const [target, entities] of clustersByTarget) {
-        console.log(`   Cluster -> ${target}: ${JSON.stringify(entities)}`);
-      }
-
-      reorderedLayers[layerIdx] = orderedLayer;
-      console.log(`   => ${JSON.stringify(orderedLayer)}`);
+      layers[layerIdx] = orderedLayer;
     }
 
-    return reorderedLayers;
+    return layers;
   }
 
   /**
    * Main entry point
    */
   static layout(entities: Entity[], relationships: Relationship[]): ConnectionLayerResult {
-    // Step 1: Convert to directed relations
-    const relations = this.convertToDirectedRelations(relationships);
+    // ÉTAPE 0: Parser les relations
+    const relationsRaw = this.parseRelations(relationships);
 
-    // Step 2: Order entities
-    const entityOrder = this.orderEntities(relations);
+    // ÉTAPE 1: Constituer le backlog
+    const { relations, connectionCount } = this.buildBacklog(relationsRaw);
 
-    // Step 3: Build clusters
+    // ÉTAPE 2: Déterminer l'ordre de traitement
+    const entityOrder = this.determineOrder(relations, connectionCount);
+
+    // ÉTAPE 3: Construction des clusters
     const clusters = this.buildClusters(entityOrder, relations);
 
-    // Step 4: Build layers
+    // ÉTAPE 4: Build layers
     let layers = this.buildLayers(entityOrder, clusters, relations);
 
-    // Step 6: Reorder by cluster (vertical organization)
+    // ÉTAPE 6: Réorganisation verticale
     layers = this.reorderLayersByCluster(layers, entityOrder, relations);
 
-    console.log('\n=== RÉSULTAT FINAL AVEC ORGANISATION VERTICALE ===\n');
+    console.log('\n' + '='.repeat(80));
+    console.log('RÉSULTAT FINAL');
+    console.log('='.repeat(80));
     layers.forEach((layer, idx) => {
       console.log(`Layer ${idx}: ${JSON.stringify(layer)}`);
     });
