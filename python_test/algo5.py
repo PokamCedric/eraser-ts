@@ -10,6 +10,81 @@ from collections import defaultdict
 
 
 # === DONNÉES DE TEST ===
+relations_input_crm = """
+// USER/ORGANIZATION
+users.profileId - profiles.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+team_members.teamId > teams.id
+team_members.userId > users.id
+teams.leadId > users.id
+
+// ACCOUNTS & CONTACTS
+contacts.accountId > accounts.id
+contacts_accounts.contactId > contacts.id
+contacts_accounts.accountId > accounts.id
+accounts.ownerId > users.id
+
+// LEADS & CAMPAIGNS
+leads.campaignId > campaigns.id
+leads.ownerId > users.id
+campaign_members.campaignId > campaigns.id
+campaign_members.contactId > contacts.id
+campaign_members.leadId > leads.id
+
+// OPPORTUNITIES & SALES
+opportunities.accountId > accounts.id
+opportunities.primaryContactId > contacts.id
+opportunities.ownerId > users.id
+opportunities.pipelineId > pipelines.id
+opportunity_products.opportunityId > opportunities.id
+opportunity_products.productId > products.id
+
+// QUOTES / ORDERS / INVOICES / PAYMENTS
+quotes.opportunityId > opportunities.id
+quotes.accountId > accounts.id
+orders.quoteId > quotes.id
+orders.accountId > accounts.id
+invoices.orderId > orders.id
+invoices.accountId > accounts.id
+payments.invoiceId > invoices.id
+payments.accountId > accounts.id
+
+// ACTIVITIES / TASKS
+activities.ownerId > users.id
+activities.assignedTo > users.id
+activity_assignments.activityId > activities.id
+activity_assignments.fromUserId > users.id
+activity_assignments.toUserId > users.id
+
+// CASES / SUPPORT
+cases.accountId > accounts.id
+cases.contactId > contacts.id
+cases.ownerId > users.id
+
+// TAGS / NOTES / ATTACHMENTS
+entity_tags.tagId > tags.id
+notes.authorId > users.id
+attachments.uploadedBy > users.id
+
+// EMAILS / INTEGRATIONS
+emails.relatedToId > accounts.id
+webhooks.lastDeliveredAt
+integration_logs.provider
+
+// AUDIT & SECURITY
+audit_logs.performedBy > users.id
+api_keys.userId > users.id
+
+// MISC
+profiles.userId > users.id
+accounts.id < opportunities.accountId
+contacts.id < notes.entityId
+accounts.id < attachments.entityId
+"""
+
 relations_input_1 = """
 users -> teams
 workspaces -> folders
@@ -301,14 +376,23 @@ for iteration_num, entity_name in enumerate(entity_order, 1):
             print(f"   -> '{entity_name}' doit être déplacé de Layer {entity_current_layer} vers Layer {required_layer} (avec cascade)")
 
             # Identifier tous les descendants (enfants) ET leurs clusters (parents)
-            def find_all_children(entity):
-                """Trouve récursivement tous les enfants d'une entité"""
+            def find_all_children(entity, visited=None):
+                """Trouve récursivement tous les enfants d'une entité (avec protection contre cycles)"""
+                if visited is None:
+                    visited = set()
+
+                if entity in visited:
+                    return []
+
+                visited.add(entity)
                 children = []
+
                 for a, b in relations:
-                    if a == entity:
+                    if a == entity and b not in visited:
                         children.append(b)
                         # Récursion pour trouver les enfants des enfants
-                        children.extend(find_all_children(b))
+                        children.extend(find_all_children(b, visited))
+
                 return list(set(children))  # Déduplication
 
             def find_all_parents(entity):
