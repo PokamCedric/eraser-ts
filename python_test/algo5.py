@@ -187,18 +187,44 @@ print("\n" + "="*80)
 print("ÉTAPE 1 : CONSTITUER LE BACKLOG")
 print("="*80)
 
-# Déduplication
-seen_relations = set()
+# Déduplication basée sur la PAIRE d'entités (peu importe l'ordre ou le symbole)
+# RÈGLE: Si on a deux fois un lien entre A et B, c'est un doublon
+# Le PREMIER lien rencontré a la priorité
+#
+# Exemples de doublons:
+#   - A > B puis A > B      → DOUBLON (même lien)
+#   - A > B puis A <> B     → DOUBLON (même paire A-B)
+#   - A - B puis B <> A     → DOUBLON (même paire A-B, ordre inversé)
+#   - A > B puis B > A      → DOUBLON (même paire A-B, ordre inversé)
+#
+# On garde toujours la PREMIÈRE relation rencontrée
+
+seen_pairs = {}  # {frozenset({a, b}): (a, b) première relation}
 unique_relations = []
+duplicates_removed = []
 
 for a, b in relations_raw:
-    relation_key = (a, b)
-    if relation_key not in seen_relations:
-        seen_relations.add(relation_key)
+    # Clé non-directionnelle: paire d'entités
+    pair_key = frozenset({a, b})
+
+    if pair_key not in seen_pairs:
+        # Première fois qu'on voit cette paire d'entités
+        seen_pairs[pair_key] = (a, b)
         unique_relations.append((a, b))
+    else:
+        # Doublon détecté! Même paire d'entités
+        first = seen_pairs[pair_key]
+        duplicates_removed.append(f"  [DOUBLON] {a} > {b} (premier: {first[0]} > {first[1]})")
 
 relations = unique_relations
 print(f"Relations après déduplication: {len(relations)}")
+
+if duplicates_removed:
+    print(f"\n{len(duplicates_removed)} doublon(s) supprimé(s):")
+    for dup in duplicates_removed:
+        print(dup)
+else:
+    print("Aucun doublon détecté")
 
 # Comptage des connexions
 connection_count = defaultdict(int)
