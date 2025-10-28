@@ -7,7 +7,7 @@ import { IRenderer } from '../../domain/repositories/IRenderer';
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
-import { ConnectionBasedLayoutEngine } from '../layout/ConnectionBasedLayoutEngine';
+import { LayerClassificationEngine } from '../layout/LayerClassificationEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
 import { getRelationshipCardinality } from '../../data/models/utils';
@@ -160,15 +160,15 @@ export class CanvasRendererAdapter implements IRenderer {
   autoLayout(): void {
     this.entityPositions.clear();
 
-    // Step 1-6: Compute hierarchical layers using connection-based algorithm
-    // This algorithm includes:
-    // - Step 1: Parse relationships and apply position rule
-    // - Step 2: Order relationships by entity
+    // Step 1-5: Compute hierarchical layers using Layer Classification Engine
+    // This algorithm uses Floyd-Warshall inversé to detect transitive intercalations
+    // - Step 0: Parse relationships (external, handled by parser)
+    // - Step 1: Build backlog (deduplication)
+    // - Step 2: Determine processing order
     // - Step 3: Build clusters
-    // - Step 4: Build layers from clusters
-    // - Step 5: Optimize layers by merging compatible ones
-    // - Step 6: Reorder elements within layers based on cluster alignment
-    const { layers } = ConnectionBasedLayoutEngine.layout(this.entities, this.relationships);
+    // - Step 4: Build layers with Floyd-Warshall inversé (transitive distance calculation)
+    // - Step 5: Vertical reorganization by cluster
+    const { layers } = LayerClassificationEngine.layout(this.entities, this.relationships);
 
     // Step 7: Field ordering within entities (only reorder fields, not entities)
     const finalLayers = MagneticAlignmentOptimizer.optimize(
