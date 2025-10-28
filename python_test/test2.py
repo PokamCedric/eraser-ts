@@ -43,48 +43,22 @@ class LayerClassifier:
                                 changed = True
 
     def compute_layers(self):
-        """Calcule les layers basés sur les distances (depuis gauche ET droite)"""
+        """Calcule les layers basés sur les distances (tri topologique)"""
         if not self.entities:
             return []
 
-        # Étape 1: Calculer les layers minimum (depuis la gauche)
-        min_layers = {entity: 0 for entity in self.entities}
+        # Calculer les layers basés sur les distances
+        layers = {entity: 0 for entity in self.entities}
 
         for _ in range(len(self.entities) ** 2):
             for (left, right), distance in self.distances.items():
-                new_layer = min_layers[left] + distance
-                if min_layers[right] < new_layer:
-                    min_layers[right] = new_layer
-
-        # Étape 2: Calculer les layers maximum (depuis la droite)
-        # Initialiser à min_layers (position minimale garantie)
-        max_layers = min_layers.copy()
-
-        # Propager depuis la droite pour pousser vers la droite
-        for _ in range(len(self.entities) ** 2):
-            for (left, right), distance in self.distances.items():
-                # left peut être poussé vers la droite si right l'est aussi
-                # left peut être au max à right - distance
-                desired_layer = max_layers[right] - distance
-                # Mais on veut MAXIMISER, donc on prend le max entre actuel et désiré
-                # SAUF si ça viole la contrainte min (left doit être >= min_layers[left])
-                if desired_layer >= min_layers[left]:
-                    max_layers[left] = max(max_layers[left], desired_layer)
-
-        # Étape 3: Recalculer les positions finales depuis la gauche avec max_layers
-        # Car certaines entités (sans successeurs) n'ont pas été mises à jour
-        final_layers = max_layers.copy()
-
-        for _ in range(len(self.entities) ** 2):
-            for (left, right), distance in self.distances.items():
-                # right doit être à left + distance
-                new_layer = final_layers[left] + distance
-                if final_layers[right] < new_layer:
-                    final_layers[right] = new_layer
+                new_layer = layers[left] + distance
+                if layers[right] < new_layer:
+                    layers[right] = new_layer
 
         # Grouper par layer
         layer_dict = {}
-        for entity, layer in final_layers.items():
+        for entity, layer in layers.items():
             if layer not in layer_dict:
                 layer_dict[layer] = []
             layer_dict[layer].append(entity)
@@ -144,6 +118,30 @@ print(f"\n=== Statistiques ===")
 print(f"Nombre d'entités: {len(classifier.entities)}")
 print(f"Nombre de relations: {len(relations)}")
 print(f"Nombre de layers: {len(layers)}")
+
+# Debug: afficher les layers calculés pour chaque entité
+print(f"\n=== Layers détaillés par entité ===")
+min_layers = {entity: 0 for entity in classifier.entities}
+for _ in range(len(classifier.entities) ** 2):
+    for (left, right), distance in classifier.distances.items():
+        new_layer = min_layers[left] + distance
+        if min_layers[right] < new_layer:
+            min_layers[right] = new_layer
+
+for entity in sorted(classifier.entities):
+    print(f"  {entity}: min_layer={min_layers[entity]}")
+
+# Debug: afficher max_layers aussi
+print(f"\n=== Max layers (après propagation depuis droite) ===")
+max_layers = min_layers.copy()
+for _ in range(len(classifier.entities) ** 2):
+    for (left, right), distance in classifier.distances.items():
+        desired_layer = max_layers[right] - distance
+        if desired_layer >= min_layers[left]:
+            max_layers[left] = max(max_layers[left], desired_layer)
+
+for entity in sorted(classifier.entities):
+    print(f"  {entity}: max_layer={max_layers[entity]}")
 
 # Afficher les intercalations détectées
 print(f"\n=== Intercalations détectées ===")
