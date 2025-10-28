@@ -7,6 +7,128 @@ Combines:
 
 from collections import defaultdict
 
+# === DONNÉES DE TEST ===
+relations_input_crm = """
+// USER/ORGANIZATION
+users.profileId - profiles.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+team_members.teamId > teams.id
+team_members.userId > users.id
+teams.leadId > users.id
+
+// ACCOUNTS & CONTACTS
+contacts.accountId > accounts.id
+contacts_accounts.contactId > contacts.id
+contacts_accounts.accountId > accounts.id
+accounts.ownerId > users.id
+
+// LEADS & CAMPAIGNS
+leads.campaignId > campaigns.id
+leads.ownerId > users.id
+campaign_members.campaignId > campaigns.id
+campaign_members.contactId > contacts.id
+campaign_members.leadId > leads.id
+
+// OPPORTUNITIES & SALES
+opportunities.accountId > accounts.id
+opportunities.primaryContactId > contacts.id
+opportunities.ownerId > users.id
+opportunities.pipelineId > pipelines.id
+opportunity_products.opportunityId > opportunities.id
+opportunity_products.productId > products.id
+
+// QUOTES / ORDERS / INVOICES / PAYMENTS
+quotes.opportunityId > opportunities.id
+quotes.accountId > accounts.id
+orders.quoteId > quotes.id
+orders.accountId > accounts.id
+invoices.orderId > orders.id
+invoices.accountId > accounts.id
+payments.invoiceId > invoices.id
+payments.accountId > accounts.id
+
+// ACTIVITIES / TASKS
+activities.ownerId > users.id
+activities.assignedTo > users.id
+activity_assignments.activityId > activities.id
+activity_assignments.fromUserId > users.id
+activity_assignments.toUserId > users.id
+
+// CASES / SUPPORT
+cases.accountId > accounts.id
+cases.contactId > contacts.id
+cases.ownerId > users.id
+
+// TAGS / NOTES / ATTACHMENTS
+notes.authorId > users.id
+attachments.uploadedBy > users.id
+
+// EMAILS / INTEGRATIONS
+emails.relatedToId > accounts.id
+webhooks.lastDeliveredAt
+integration_logs.provider
+
+// AUDIT & SECURITY
+audit_logs.performedBy > users.id
+api_keys.userId > users.id
+
+// MISC
+profiles.userId > users.id
+accounts.id < opportunities.accountId
+contacts.id < notes.entityId
+accounts.id < attachments.entityId
+"""
+
+relations_input_1 = """
+users -> teams
+workspaces -> folders
+workspaces -> teams
+chat -> workspaces
+invite -> workspaces
+invite -> users
+users -> orders
+orders -> order_items
+order_items -> products
+products -> categories
+users -> reviews
+products -> reviews
+orders -> payments
+users -> payments
+orders -> shipments
+shipments -> addresses
+users -> carts
+carts -> cart_items
+cart_items -> products
+users -> addresses
+"""
+
+relations_input_3 = """
+users.profileId - profiles.id
+posts.authorId > users.id
+users.id > teams.id
+comments.postId > posts.id
+tags.userId > users.id
+post_tags.postId > posts.id
+post_tags.tagId > tags.id
+user_roles.userId > users.id
+user_roles.roleId > roles.id
+role_permissions.roleId > roles.id
+role_permissions.permissionId > permissions.id
+projects.teamId > teams.id
+milestones.projectId > projects.id
+attachments.postId > posts.id
+notifications.userId > roles.id
+user_projects.userId > users.id
+user_projects.projectId > projects.id
+projects.id < posts.authorId
+comments.userId > users.id
+"""
+
+# Choisir le DSL à tester
+relations_input = relations_input_crm
 
 # === LayerClassifier from test4.py ===
 class LayerClassifier:
@@ -114,9 +236,9 @@ class LayerClassifier:
                         layers[entity] = 0
 
         # Afficher résumé
-        print(f"\n[DEBUG] ========================================")
-        print(f"[DEBUG] DISTANCES PAR RAPPORT A {reference_entity.upper()}")
-        print(f"[DEBUG] ========================================")
+        # print(f"\n[DEBUG] ========================================")
+        # print(f"[DEBUG] DISTANCES PAR RAPPORT A {reference_entity.upper()}")
+        # print(f"[DEBUG] ========================================")
 
         by_distance = {}
         for entity in layers.keys():
@@ -128,9 +250,9 @@ class LayerClassifier:
 
         for dist in sorted(by_distance.keys()):
             direction = "GAUCHE" if dist < 0 else ("DROITE" if dist > 0 else "MEME LAYER")
-            print(f"[DEBUG] Distance {dist:+d} ({direction}):")
-            for entity in sorted(by_distance[dist]):
-                print(f"[DEBUG]   - {entity}")
+            # print(f"[DEBUG] Distance {dist:+d} ({direction}):")
+            # for entity in sorted(by_distance[dist]):
+            #     print(f"[DEBUG]   - {entity}")
 
         # Normaliser
         if layers:
@@ -153,63 +275,6 @@ class LayerClassifier:
         layers = self.compute_layers()
         return " - ".join(["(" + ", ".join(layer) + ")" for layer in layers])
 
-
-# === DONNÉES DE TEST CRM (from test4.py) ===
-relations_input_crm = """
-// USER/ORGANIZATION
-user_roles.userId > users.id
-team_members.teamId > teams.id
-team_members.userId > users.id
-accounts.ownerId > users.id
-
-// ACCOUNTS & CONTACTS
-contacts.accountId > accounts.id
-contacts_accounts.contactId > contacts.id
-contacts_accounts.accountId > accounts.id
-
-// LEADS & CAMPAIGNS
-leads.ownerId > users.id
-campaign_members.leadId > leads.id
-campaign_members.contactId > contacts.id
-
-// OPPORTUNITIES & SALES
-opportunities.accountId > accounts.id
-opportunities.primaryContactId > contacts.id
-opportunities.ownerId > users.id
-opportunity_products.opportunityId > opportunities.id
-opportunity_products.productId > products.id
-
-// QUOTES / ORDERS / INVOICES / PAYMENTS
-quotes.accountId > accounts.id
-quotes.opportunityId > opportunities.id
-orders.quoteId > quotes.id
-orders.accountId > accounts.id
-invoices.orderId > orders.id
-invoices.accountId > accounts.id
-payments.invoiceId > invoices.id
-payments.accountId > accounts.id
-
-// ACTIVITIES
-activities.ownerId > users.id
-activity_assignments.activityId > activities.id
-activity_assignments.fromUserId > users.id
-
-// CASES / SUPPORT
-cases.accountId > accounts.id
-cases.contactId > contacts.id
-cases.ownerId > users.id
-
-// TAGS / NOTES / ATTACHMENTS
-notes.authorId > users.id
-attachments.uploadedBy > users.id
-accounts.id < attachments.entityId
-
-// AUDIT & SECURITY
-audit_logs.performedBy > users.id
-api_keys.userId > users.id
-"""
-
-
 # === ÉTAPE 0 : PARSER LES RELATIONS ===
 print("="*80)
 print("ÉTAPE 0 : PARSER LES RELATIONS")
@@ -222,7 +287,7 @@ def extract_table_name(field_ref):
     return field_ref
 
 relations_raw = []
-for line in relations_input_crm.strip().split('\n'):
+for line in relations_input.strip().split('\n'):
     line = line.strip()
     if not line or line.startswith('//'):
         continue
@@ -246,7 +311,7 @@ for line in relations_input_crm.strip().split('\n'):
         parts = line.split('<')
         a = extract_table_name(parts[0].strip())
         b = extract_table_name(parts[1].strip())
-        relations_raw.append((b, a))  # Invert for < operator
+        relations_raw.append((a, b))  # Left entity stays left regardless of arrow direction
     elif '-' in line:
         parts = line.split('-')
         a = extract_table_name(parts[0].strip())
@@ -435,7 +500,7 @@ for idx, major_entity in enumerate(major_entities, 1):
     print(f"\n   === BUILD LAYERS pour '{major_entity}' ===")
     layers = classifier.compute_layers()
 
-    print(f"\n   === RESULTAT FINAL ==={''}")
+    print(f"\n   === RESULTAT POUR '{major_entity}' ===")
     for layer_idx, layer in enumerate(layers):
         print(f"   Layer {layer_idx}: {layer}")
 
@@ -477,6 +542,31 @@ for idx, major_entity in enumerate(major_entities, 1):
 
     print("\n" + "-"*80)
 
+
+# === RÉSULTAT FINAL GLOBAL ===
+print("\n" + "="*80)
+print("RÉSULTAT FINAL GLOBAL - TOUTES LES ENTITÉS")
+print("="*80)
+
+# Build final classifier with ALL relations
+final_classifier = LayerClassifier()
+for left, right in relations:
+    final_classifier.add_relation(left, right)
+
+# Build final layers
+final_layers = final_classifier.compute_layers()
+
+print(f"\n=== RESULTAT FINAL ===")
+for layer_idx, layer in enumerate(final_layers):
+    print(f"Layer {layer_idx}: {layer}")
+
+print(f"\n{final_classifier}")
+
+# Final Statistics
+print(f"\n=== STATISTIQUES FINALES ===")
+print(f"Nombre total d'entites: {len(final_classifier.entities)}")
+print(f"Nombre total de relations: {len(relations)}")
+print(f"Nombre de layers: {len(final_layers)}")
 
 print("\n" + "="*80)
 print("ALGORITHME TERMINÉ")
