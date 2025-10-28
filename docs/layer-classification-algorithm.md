@@ -99,11 +99,11 @@ Pourquoi? Parce qu'elle est au centre du graphe. En la positionnant en premier c
 
 C'est ici que réside toute la magie de l'algorithme. Cette phase résout le problème le plus complexe et le plus subtil.
 
-### Problème 2.1 : Les Intercalations - Le Théorème de Thalès Appliqué aux Graphes
+### Problème 2.1 : Les Intercalations - Le Théorème de Thalès **Inversé**
 
-**Scénario**: Vous avez trois relations:
+**Scénario**: Vous avez quatre relations:
 ```
-projects → teams    (distance = 1)
+projects → teams    (distance = 1)  ← Relation directe (input)
 projects → posts    (distance = 1)
 posts → users       (distance = 1)
 users → teams       (distance = 1)
@@ -127,9 +127,24 @@ Si on garde distance = 1, on créerait une impossibilité visuelle: `teams` devr
 - 1 case à droite de `projects`
 - 3 cases à droite de `projects` (via le chemin long)
 
-**Le Théorème de Thalès adapté**:
-> Quand Y s'intercale entre X et Z, alors:
-> `distance(X, Z) = distance(X, Y) + distance(Y, Z)`
+**Le Théorème de Thalès - Version Classique**:
+> AB + BC + CD = AD
+>
+> Si on connaît les segments AB, BC et CD, on peut calculer AD.
+
+**Notre Problème - Thalès Inversé**:
+> On connaît AD (la relation directe `projects → teams`)
+>
+> Mais on **ne sait pas** par quels points intermédiaires passer!
+>
+> Est-ce `AD` direct? Ou `AB + BC + CD`? Ou `AB + BC + CE + ED`?
+
+**La Solution**:
+> Utiliser Floyd-Warshall (lui aussi inversé) pour **découvrir tous les chemins possibles**
+>
+> Puis appliquer Thalès inversé: `AD = max(AB + BC + CD, AB + BC + CE + ED, ...)`
+>
+> On garde le chemin le **plus long** (le plus d'intercalations)
 
 ### Problème 2.2 : Les Intercalations en Chaîne
 
@@ -146,13 +161,65 @@ Il ne suffit pas de détecter que B s'intercale entre A et C. Il faut aussi:
 
 **Le piège**: Si on ne traite qu'une intercalation à la fois, on rate les chaînes!
 
-### Solution : L'Algorithme de Floyd-Warshall Modifié
+### Solution : La Double Inversion - Floyd-Warshall × Thalès
 
-Floyd-Warshall est classiquement utilisé pour trouver le **plus court chemin** entre tous les nœuds d'un graphe.
+Notre algorithme combine **deux inversions** de théorèmes classiques:
 
-**Notre innovation**: L'adapter pour trouver le **plus long chemin** (le plus grand nombre d'intercalations).
+#### **Inversion #1 : Floyd-Warshall inversé (MIN → MAX)**
 
-**Pourquoi le plus long?** Parce qu'on veut préserver **toutes** les intercalations, pas juste le chemin direct.
+**Floyd-Warshall classique**:
+> Trouve le **plus court chemin** entre tous les nœuds
+>
+> `distance(I, J) = MIN(distance_directe, distance_via_K)`
+
+**Notre version - Floyd-Warshall inversé**:
+> Trouve le **plus long chemin** (le plus d'intercalations)
+>
+> `distance(I, J) = MAX(distance_directe, distance_via_K)`
+
+Pourquoi? Parce qu'on veut **découvrir tous les chemins possibles**, pas juste le plus court!
+
+#### **Inversion #2 : Thalès inversé (décomposition → recomposition)**
+
+**Thalès classique** (décomposition connue):
+> `AB + BC + CD = AD`
+>
+> On connaît les segments, on calcule la somme
+
+**Notre version - Thalès inversé** (décomposition inconnue):
+> `AD = AB + BC + CD` ou `AD = AB + BE + ED` ou `AD = ...`?
+>
+> On connaît AD (relation directe), mais pas par quels points passer!
+
+#### **La Synergie des Deux Inversions**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  INPUT: AD = 1 (relation directe projects → teams)     │
+└─────────────────────────────────────────────────────────┘
+                         ↓
+         ┌───────────────────────────────┐
+         │  Floyd-Warshall INVERSÉ       │
+         │  (cherche TOUS les chemins)   │
+         └───────────────────────────────┘
+                         ↓
+        ┌─────────────────────────────────────┐
+        │  Chemins découverts:                │
+        │  - AD direct = 1                    │
+        │  - A→B→C→D = 3                      │
+        │  - A→B→E→D = 3                      │
+        └─────────────────────────────────────┘
+                         ↓
+         ┌───────────────────────────────┐
+         │  Thalès INVERSÉ               │
+         │  (recompose le bon chemin)    │
+         └───────────────────────────────┘
+                         ↓
+     ┌──────────────────────────────────────┐
+     │  OUTPUT: AD = MAX(1, 3, 3) = 3      │
+     │  (le chemin avec le + d'intercalations)│
+     └──────────────────────────────────────┘
+```
 
 **Le principe**:
 
@@ -160,13 +227,13 @@ Pour chaque entité K (nœud intermédiaire potentiel):
 ```
 Pour chaque paire (I, J):
     Si on a un chemin I → K et un chemin K → J:
-        distance_via_K = distance(I, K) + distance(K, J)
+        distance_via_K = distance(I, K) + distance(K, J)  ← Thalès inversé
 
-        Si distance_via_K > distance_actuelle(I, J):
+        Si distance_via_K > distance_actuelle(I, J):      ← Floyd inversé (MAX)
             distance(I, J) = distance_via_K
 ```
 
-**L'astuce**: En itérant sur **toutes** les entités comme nœuds intermédiaires, on découvre toutes les chaînes d'intercalations, même les plus longues.
+**L'astuce**: En itérant sur **toutes** les entités comme nœuds intermédiaires, Floyd-Warshall découvre tous les chemins possibles, et Thalès recompose les distances en gardant le plus long.
 
 ### Exemple Complet
 
@@ -327,7 +394,7 @@ Pour de très grands graphes (>1000 entités):
 
 1. **Décomposition en composantes connexes**: Traiter chaque sous-graphe indépendamment
 2. **Distances partielles**: Ne calculer les distances transitives que pour les relations directes ± 2 niveaux
-3. **Pruning précoce**: Arrêter la propagation Floyd-Warshall quand aucune distance ne change pendant une itération complète
+3. **Pruning précoce**: Arrêter la propagation Floyd-Warshall quand aucune distance ne change pendant une itération complète (done)
 
 ---
 

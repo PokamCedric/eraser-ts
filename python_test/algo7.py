@@ -128,7 +128,7 @@ comments.userId > users.id
 """
 
 # Choisir le DSL à tester
-relations_input = relations_input_1  # Test with CRM dataset
+relations_input = relations_input_crm  # Test with CRM dataset
 
 # === LayerClassifier from test4.py ===
 class LayerClassifier:
@@ -152,25 +152,43 @@ class LayerClassifier:
 
         Utilise Floyd-Warshall modifié pour calculer la distance MAXIMALE entre toutes paires.
         La distance maximale représente le nombre d'intercalations dans le chemin le plus long.
-        """
-        # Floyd-Warshall: pour chaque nœud intermédiaire k
-        for k in self.entities:
-            # Pour chaque paire source i et destination j
-            for i in self.entities:
-                for j in self.entities:
-                    if i != j and i != k and j != k:
-                        # Si on a un chemin i -> k et k -> j
-                        if (i, k) in self.distances and (k, j) in self.distances:
-                            # Distance via k
-                            dist_via_k = self.distances[(i, k)] + self.distances[(k, j)]
 
-                            # Mettre à jour la distance i -> j si on trouve un chemin plus long
-                            if (i, j) in self.distances:
-                                if dist_via_k > self.distances[(i, j)]:
+        Optimisation: Pruning précoce - arrêt global si aucune distance ne change pendant
+        une passe complète sur tous les nœuds intermédiaires.
+        """
+        # Répéter Floyd-Warshall jusqu'à convergence (pruning précoce)
+        max_iterations = len(self.entities)  # Au pire cas: nombre d'entités
+        iteration = 0
+
+        while iteration < max_iterations:
+            iteration += 1
+            changed_in_pass = False  # Tracker les changements sur toute la passe
+
+            # Floyd-Warshall: pour chaque nœud intermédiaire k
+            for k in self.entities:
+                # Pour chaque paire source i et destination j
+                for i in self.entities:
+                    for j in self.entities:
+                        if i != j and i != k and j != k:
+                            # Si on a un chemin i -> k et k -> j
+                            if (i, k) in self.distances and (k, j) in self.distances:
+                                # Distance via k
+                                dist_via_k = self.distances[(i, k)] + self.distances[(k, j)]
+
+                                # Mettre à jour la distance i -> j si on trouve un chemin plus long
+                                if (i, j) in self.distances:
+                                    if dist_via_k > self.distances[(i, j)]:
+                                        self.distances[(i, j)] = dist_via_k
+                                        changed_in_pass = True
+                                else:
+                                    # Créer une nouvelle distance transitive
                                     self.distances[(i, j)] = dist_via_k
-                            else:
-                                # Créer une nouvelle distance transitive
-                                self.distances[(i, j)] = dist_via_k
+                                    changed_in_pass = True
+
+            # Pruning précoce: si aucune distance n'a changé pendant toute cette passe,
+            # l'algorithme a convergé - on peut arrêter
+            if not changed_in_pass:
+                break
 
     def _count_connections(self):
         """Compte le nombre de connexions pour chaque entité"""
