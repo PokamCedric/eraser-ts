@@ -600,7 +600,108 @@ for left, right in relations:
 # Build final layers
 final_layers = final_classifier.compute_layers()
 
-print(f"\n=== RESULTAT FINAL ===")
+print(f"\n=== RESULTAT AVANT RÉORGANISATION ===")
+for layer_idx, layer in enumerate(final_layers):
+    print(f"Layer {layer_idx}: {layer}")
+
+
+# === ÉTAPE 6 : RÉORGANISATION VERTICALE PAR CLUSTER ===
+print("\n" + "="*80)
+print("ÉTAPE 6 : RÉORGANISATION VERTICALE")
+print("="*80)
+
+def reorder_layers_by_cluster(layers, relations, entity_order):
+    """
+    Réorganise l'ordre vertical des entités dans chaque layer pour aligner
+    les clusters visuellement (entités pointant vers la même cible sont regroupées)
+    """
+    if not layers:
+        return layers
+
+    # Dernier layer: ordre selon entity_order
+    last_layer_idx = len(layers) - 1
+    last_layer = layers[last_layer_idx]
+
+    ordered_last = []
+    for entity in entity_order:
+        if entity in last_layer:
+            ordered_last.append(entity)
+
+    for entity in last_layer:
+        if entity not in ordered_last:
+            ordered_last.append(entity)
+
+    layers[last_layer_idx] = ordered_last
+
+    # Autres layers de droite à gauche
+    for layer_idx in range(len(layers) - 2, -1, -1):
+        current_layer = layers[layer_idx]
+        next_layer = layers[layer_idx + 1]
+
+        # Trouver les cibles pour chaque entité
+        entity_to_all_targets = {}
+        for entity in current_layer:
+            targets = []
+            for a, b in relations:
+                if a == entity and b in next_layer:
+                    targets.append(b)
+            entity_to_all_targets[entity] = targets
+
+        # Grouper les entités par leur cible principale (première cible ou None)
+        # Ceci garantit que les entités pointant vers la même cible restent groupées
+        entity_primary_target = {}
+        for entity in current_layer:
+            targets = entity_to_all_targets[entity]
+            if targets:
+                # Prendre la première cible comme cible principale (ou celle avec position min)
+                primary = min(targets, key=lambda t: next_layer.index(t))
+                entity_primary_target[entity] = primary
+            else:
+                entity_primary_target[entity] = None
+
+        # Calculer position de la cible principale
+        entity_target_pos = {}
+        for entity in current_layer:
+            primary = entity_primary_target[entity]
+            if primary is None:
+                entity_target_pos[entity] = -1
+            else:
+                entity_target_pos[entity] = next_layer.index(primary)
+
+        # Grouper les entités par leur cible principale
+        # Créer des groupes: {target: [entities]}
+        target_groups = {}
+        for entity in current_layer:
+            primary = entity_primary_target[entity]
+            if primary not in target_groups:
+                target_groups[primary] = []
+            target_groups[primary].append(entity)
+
+        # Trier chaque groupe par entity_order
+        for target in target_groups:
+            target_groups[target] = sorted(target_groups[target], key=lambda e: (
+                entity_order.index(e) if e in entity_order else 999
+            ))
+
+        # Ordonner les groupes par position de leur cible dans next_layer
+        # Les entités sans cible (None) vont en premier
+        ordered_targets = sorted(target_groups.keys(), key=lambda t: (
+            next_layer.index(t) if t is not None else -1
+        ))
+
+        # Construire la liste finale
+        ordered_layer = []
+        for target in ordered_targets:
+            ordered_layer.extend(target_groups[target])
+
+        layers[layer_idx] = ordered_layer
+
+    return layers
+
+# Appliquer la réorganisation
+final_layers = reorder_layers_by_cluster(final_layers, relations, entity_order)
+
+print(f"\n=== RESULTAT FINAL (APRÈS RÉORGANISATION) ===")
 for layer_idx, layer in enumerate(final_layers):
     print(f"Layer {layer_idx}: {layer}")
 
@@ -611,6 +712,22 @@ print(f"\n=== STATISTIQUES FINALES ===")
 print(f"Nombre total d'entites: {len(final_classifier.entities)}")
 print(f"Nombre total de relations: {len(relations)}")
 print(f"Nombre de layers: {len(final_layers)}")
+
+# === VISUALISATION 2D ===
+print("\n" + "="*80)
+print("VISUALISATION 2D")
+print("="*80)
+if final_layers:
+    max_entities = max(len(layer) for layer in final_layers)
+    for row in range(max_entities):
+        line = ""
+        for layer in final_layers:
+            if row < len(layer):
+                entity = layer[row]
+                line += f"{entity:20}"
+            else:
+                line += " " * 20
+        print(line)
 
 print("\n" + "="*80)
 print("ALGORITHME TERMINÉ")

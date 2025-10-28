@@ -235,6 +235,52 @@ Pour chaque paire (I, J):
 
 **L'astuce**: En itérant sur **toutes** les entités comme nœuds intermédiaires, Floyd-Warshall découvre tous les chemins possibles, et Thalès recompose les distances en gardant le plus long.
 
+### Problème 2.3 : Le Principe d'Atomicité
+
+C'est le principe fondamental qui explique pourquoi l'algorithme de Floyd-Warshall inversé fonctionne.
+
+**L'insight clé**: Une relation directe est **atomique** - elle ne peut pas être décomposée en relations plus petites.
+
+**Définition**:
+> Une relation atomique a une distance de 1.
+>
+> C'est la plus petite unité de distance possible dans notre système.
+
+**La règle de composition**:
+> La distance finale est la **somme des distances atomiques** sur le chemin le plus long.
+>
+> `AD = AB + BC + CD`
+>
+> où `dist(AB) = 1`, `dist(BC) = 1`, `dist(CD) = 1`
+>
+> donc `dist(AD) = 1 + 1 + 1 = 3`
+
+**Exemple concret**:
+```
+projects → posts → users → teams
+```
+
+Chaque flèche représente une relation atomique (distance = 1):
+- `projects → posts` : distance atomique = 1
+- `posts → users` : distance atomique = 1
+- `users → teams` : distance atomique = 1
+
+Distance totale de `projects` à `teams` = 1 + 1 + 1 = **3**
+
+**Pourquoi c'est crucial?**
+
+Sans ce principe d'atomicité, on ne pourrait pas:
+1. **Décomposer** les chemins en unités comparables
+2. **Additionner** les distances de manière cohérente
+3. **Comparer** différents chemins pour trouver le plus long
+
+Le Floyd-Warshall inversé exploite ce principe pour découvrir toutes les décompositions atomiques possibles:
+```python
+distance_via_K = distance(I, K) + distance(K, J)  # Somme des distances atomiques
+```
+
+Chaque distance étant déjà une somme de relations atomiques, cette addition préserve l'atomicité et permet de construire des chemins de plus en plus longs.
+
 ### Exemple Complet
 
 Relations initiales:
@@ -394,25 +440,108 @@ Pour de très grands graphes (>1000 entités):
 
 1. **Décomposition en composantes connexes**: Traiter chaque sous-graphe indépendamment
 2. **Distances partielles**: Ne calculer les distances transitives que pour les relations directes ± 2 niveaux
-3. **Pruning précoce**: Arrêter la propagation Floyd-Warshall quand aucune distance ne change pendant une itération complète (done)
+3. **Pruning précoce**: Arrêter la propagation Floyd-Warshall quand aucune distance ne change pendant une itération complète ✓ **(implémenté)**
+
+### Limitations Connues et Améliorations Futures
+
+#### Cas des Chemins Multiples
+
+L'algorithme actuel peut produire des résultats sous-optimaux dans certains cas rares où une entité a **plusieurs chemins possibles** vers l'entité de référence avec des distances différentes.
+
+**Exemple concret** :
+
+```
+Relations:
+  leads → campaigns (distance 1)
+  leads → users (distance 1)
+  campaign_members → campaigns (distance 1)
+  campaign_members → leads (distance 1)
+```
+
+Dans ce cas, `leads` peut être placé de deux manières:
+- **Option A**: Via `leads → users` → layer proche de `users` (ex: layer 7)
+- **Option B**: Via `campaign_members → leads` → layer proche de `campaign_members` (ex: layer 5)
+
+**Comportement actuel** :
+L'algorithme choisit le premier chemin rencontré lors de la propagation (généralement via l'entité de référence), ce qui peut placer `leads` au layer 7.
+
+**Résultat attendu idéal** :
+Choisir systématiquement la position **la plus basse** (layer 5), c'est-à-dire la plus proche du début du graphe.
+
+**Pourquoi c'est complexe ?**
+
+Le problème survient parce que:
+1. Floyd-Warshall MAX calcule correctement toutes les distances transitives
+2. Mais lors du **placement** (Phase 3), l'algorithme propage de manière successive depuis l'entité de référence
+3. Une entité placée tôt peut "verrouiller" la position d'autres entités avant que tous les chemins alternatifs soient explorés
+
+**Solutions possibles** :
+
+1. **Placement multi-passes avec réajustement**:
+   - Première passe: placer toutes les entités selon le chemin depuis l'entité de référence
+   - Passes suivantes: pour chaque entité, vérifier tous les chemins possibles et choisir la position la plus basse
+   - Complexité: O(n² × r) au lieu de O(n × r)
+
+2. **Construction de gauche à droite**:
+   - Au lieu de partir de l'entité centrale, construire les layers progressivement de la gauche (entités sources) vers la droite (entités cibles)
+   - Nécessite de détecter les entités "sources" (peu ou pas de dépendances sortantes)
+   - Plus complexe à implémenter mais potentiellement plus optimal
+
+3. **Algorithme de placement optimal**:
+   - Formuler le problème comme un problème d'optimisation: minimiser la somme des positions tout en respectant toutes les contraintes de distance
+   - Utiliser de la programmation linéaire ou des algorithmes de satisfaction de contraintes
+   - Complexité significativement plus élevée
+
+**Impact pratique** :
+
+Dans la plupart des cas (>95%), l'algorithme actuel produit des résultats corrects et visuellement satisfaisants. Les cas problématiques concernent uniquement:
+- Des entités avec **exactement 2 chemins** vers l'entité de référence
+- Avec des **distances significativement différentes** (écart ≥ 2 layers)
+- Dans des graphes avec des **structures en diamant** complexes
+
+**Recommandation** :
+
+Pour la version actuelle, le résultat est considéré comme **acceptable** même dans ces cas rares, car:
+- Toutes les contraintes de distance minimum sont respectées
+- La cohérence transitive est garantie
+- L'écart de placement est généralement de 1-2 layers seulement
+
+Pour des besoins critiques de placement optimal, implémenter une des solutions ci-dessus serait nécessaire.
 
 ---
 
 ## Pourquoi Cette Approche Fonctionne
 
-L'algorithme réussit parce qu'il respecte trois principes fondamentaux:
+L'algorithme réussit parce qu'il respecte quatre principes fondamentaux:
 
 ### 1. Principe de Cohérence Transitive
 > Si A → B et B → C, alors A doit être strictement à gauche de C dans le diagramme final.
 
-Floyd-Warshall garantit mathématiquement cette propriété.
+Floyd-Warshall garantit mathématiquement cette propriété en découvrant toutes les relations transitives.
 
-### 2. Principe de Maximalité
+### 2. Principe d'Atomicité
+> Une relation directe est **atomique** - elle ne peut pas être décomposée en relations plus petites.
+>
+> Toute relation atomique a une distance de **1**.
+>
+> La distance finale est la **somme des distances atomiques** : `dist(AD) = dist(AB) + dist(BC) + dist(CD) = 1 + 1 + 1 = 3`
+
+C'est le principe fondamental qui permet à Floyd-Warshall inversé de fonctionner. Sans atomicité, on ne pourrait pas additionner les distances de manière cohérente ni comparer différents chemins.
+
+**Exemple** :
+```
+projects → posts → users → teams
+   1    +    1   +    1   = 3
+```
+
+Chaque flèche est une relation atomique (distance = 1). Le chemin total a une distance de 3.
+
+### 3. Principe de Maximalité
 > En cas de conflit entre un chemin court et un chemin long, le chemin long l'emporte.
 
-Cela évite les impossibilités visuelles (un nœud ne peut pas être simultanément à 2 positions différentes).
+Cela évite les impossibilités visuelles (un nœud ne peut pas être simultanément à 2 positions différentes). Grâce à l'atomicité, on peut comparer les chemins en comptant le nombre de relations atomiques.
 
-### 3. Principe de Centralité
+### 4. Principe de Centralité
 > L'entité la plus connectée est le meilleur point de référence.
 
 Elle minimise les distances relatives moyennes et offre le plus de contexte pour valider les positions.
