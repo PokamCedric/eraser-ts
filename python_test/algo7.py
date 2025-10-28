@@ -128,7 +128,7 @@ comments.userId > users.id
 """
 
 # Choisir le DSL à tester
-relations_input = relations_input_crm
+relations_input = relations_input_1  # Test with CRM dataset
 
 # === LayerClassifier from test4.py ===
 class LayerClassifier:
@@ -148,27 +148,29 @@ class LayerClassifier:
         self._update_distances()
 
     def _update_distances(self):
-        """Met à jour les distances en détectant les intercalations (Théorème de Thalès)"""
-        changed = True
-        max_iterations = len(self.entities) ** 2
-        iteration = 0
+        """Met à jour les distances en détectant les intercalations transitives (Théorème de Thalès)
 
-        while changed and iteration < max_iterations:
-            changed = False
-            iteration += 1
+        Utilise Floyd-Warshall modifié pour calculer la distance MAXIMALE entre toutes paires.
+        La distance maximale représente le nombre d'intercalations dans le chemin le plus long.
+        """
+        # Floyd-Warshall: pour chaque nœud intermédiaire k
+        for k in self.entities:
+            # Pour chaque paire source i et destination j
+            for i in self.entities:
+                for j in self.entities:
+                    if i != j and i != k and j != k:
+                        # Si on a un chemin i -> k et k -> j
+                        if (i, k) in self.distances and (k, j) in self.distances:
+                            # Distance via k
+                            dist_via_k = self.distances[(i, k)] + self.distances[(k, j)]
 
-            for (x, z) in self.relations:
-                for y in self.entities:
-                    if y != x and y != z:
-                        if (x, y) in self.distances and (y, z) in self.distances:
-                            new_distance = self.distances[(x, y)] + self.distances[(y, z)]
-                            if (x, z) in self.distances:
-                                if self.distances[(x, z)] < new_distance:
-                                    self.distances[(x, z)] = new_distance
-                                    changed = True
+                            # Mettre à jour la distance i -> j si on trouve un chemin plus long
+                            if (i, j) in self.distances:
+                                if dist_via_k > self.distances[(i, j)]:
+                                    self.distances[(i, j)] = dist_via_k
                             else:
-                                self.distances[(x, z)] = new_distance
-                                changed = True
+                                # Créer une nouvelle distance transitive
+                                self.distances[(i, j)] = dist_via_k
 
     def _count_connections(self):
         """Compte le nombre de connexions pour chaque entité"""
@@ -186,11 +188,35 @@ class LayerClassifier:
         if not self.entities:
             return []
 
-        # Étape 1: Trouver l'entité la plus connectée
+        # Étape 1: Trouver l'entité la plus connectée (avec cascade de critères en cas d'égalité)
         connections = self._count_connections()
-        reference_entity = max(connections.items(), key=lambda x: x[1])[0]
 
-        print(f"\n[DEBUG] Entite de reference: {reference_entity} ({connections[reference_entity]} connexions)")
+        # Cascade de critères pour choisir la référence:
+        # 1. Nombre de connexions directes (critère primaire)
+        # 2. Somme des connexions des voisins (critère secondaire)
+        # 3. Ordre d'apparition (critère tertiaire - implicite dans max())
+
+        def get_reference_score(entity):
+            """Calcule le score de référence d'une entité avec cascade de critères"""
+            # Critère 1: Nombre de connexions directes
+            direct_connections = connections[entity]
+
+            # Critère 2: Somme des connexions des voisins
+            neighbors_connections_sum = 0
+            for left, right in self.relations:
+                if left == entity:
+                    neighbors_connections_sum += connections.get(right, 0)
+                elif right == entity:
+                    neighbors_connections_sum += connections.get(left, 0)
+
+            # Retourner un tuple pour tri lexicographique
+            # (plus grand nombre de connexions, plus grande somme des voisins)
+            return (direct_connections, neighbors_connections_sum)
+
+        reference_entity = max(connections.keys(), key=get_reference_score)
+        ref_score = get_reference_score(reference_entity)
+
+        print(f"\n[DEBUG] Entite de reference: {reference_entity} ({connections[reference_entity]} connexions, somme voisins: {ref_score[1]})")
 
         # Étape 2: Trier les relations par connectivité
         sorted_distances = sorted(
@@ -236,9 +262,9 @@ class LayerClassifier:
                         layers[entity] = 0
 
         # Afficher résumé
-        # print(f"\n[DEBUG] ========================================")
-        # print(f"[DEBUG] DISTANCES PAR RAPPORT A {reference_entity.upper()}")
-        # print(f"[DEBUG] ========================================")
+        print(f"\n[DEBUG] ========================================")
+        print(f"[DEBUG] DISTANCES PAR RAPPORT A {reference_entity.upper()}")
+        print(f"[DEBUG] ========================================")
 
         by_distance = {}
         for entity in layers.keys():
@@ -250,9 +276,9 @@ class LayerClassifier:
 
         for dist in sorted(by_distance.keys()):
             direction = "GAUCHE" if dist < 0 else ("DROITE" if dist > 0 else "MEME LAYER")
-            # print(f"[DEBUG] Distance {dist:+d} ({direction}):")
-            # for entity in sorted(by_distance[dist]):
-            #     print(f"[DEBUG]   - {entity}")
+            print(f"[DEBUG] Distance {dist:+d} ({direction}):")
+            for entity in sorted(by_distance[dist]):
+                print(f"[DEBUG]   - {entity}")
 
         # Normaliser
         if layers:
