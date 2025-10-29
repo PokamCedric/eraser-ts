@@ -127,6 +127,16 @@ projects.id < posts.authorId
 comments.userId > users.id
 """
 
+debug = False
+    # helper
+def log(info : str):
+    if debug: print(info)
+
+def logTitle(  title: str   ):
+    log('\n' + '='*80)
+    log(title)
+    log('='*80)
+
 # Choisir le DSL à tester
 relations_input = relations_input_crm  # Test with CRM dataset
 
@@ -234,7 +244,7 @@ class LayerClassifier:
         reference_entity = max(connections.keys(), key=get_reference_score)
         ref_score = get_reference_score(reference_entity)
 
-        print(f"\n[DEBUG] Entite de reference: {reference_entity} ({connections[reference_entity]} connexions, somme voisins: {ref_score[1]})")
+        log(f"Entite de reference: {reference_entity} ({connections[reference_entity]} connexions, somme voisins: {ref_score[1]})")
 
         # Étape 2: Trier les relations par connectivité
         sorted_distances = sorted(
@@ -243,10 +253,10 @@ class LayerClassifier:
             reverse=True
         )
 
-        print(f"\n[DEBUG] === Relations triees par connectivite ===")
+        log(f"=== Relations triees par connectivite ===")
         for idx, ((left, right), distance) in enumerate(sorted_distances[:15], 1):
             conn_sum = connections[left] + connections[right]
-            print(f"[DEBUG] {idx}. {left}({connections[left]}) r {right}({connections[right]}) = {conn_sum} connexions")
+            log(f"{idx}. {left}({connections[left]}) r {right}({connections[right]}) = {conn_sum} connexions")
 
         # Étape 3: Placer l'entité de référence au layer 0
         layers = {reference_entity: 0}
@@ -280,9 +290,9 @@ class LayerClassifier:
                         layers[entity] = 0
 
         # Afficher résumé
-        print(f"\n[DEBUG] ========================================")
-        print(f"[DEBUG] DISTANCES PAR RAPPORT A {reference_entity.upper()}")
-        print(f"[DEBUG] ========================================")
+        log(f"========================================")
+        log(f"DISTANCES PAR RAPPORT A {reference_entity.upper()}")
+        log(f"========================================")
 
         by_distance = {}
         for entity in layers.keys():
@@ -294,16 +304,16 @@ class LayerClassifier:
 
         for dist in sorted(by_distance.keys()):
             direction = "GAUCHE" if dist < 0 else ("DROITE" if dist > 0 else "MEME LAYER")
-            print(f"[DEBUG] Distance {dist:+d} ({direction}):")
+            log(f"Distance {dist:+d} ({direction}):")
             for entity in sorted(by_distance[dist]):
-                print(f"[DEBUG]   - {entity}")
+                log(f"  - {entity}")
 
         # Normaliser
         if layers:
             min_layer = min(layers.values())
             layers = {e: l - min_layer for e, l in layers.items()}
-            print(f"\n[DEBUG] Normalisation: decalage de {-min_layer}")
-            print(f"[DEBUG] {reference_entity} est maintenant au layer {layers[reference_entity]}")
+            log(f"Normalisation: decalage de {-min_layer}")
+            log(f"{reference_entity} est maintenant au layer {layers[reference_entity]}")
 
         # Grouper par layer
         layer_dict = {}
@@ -320,9 +330,7 @@ class LayerClassifier:
         return " - ".join(["(" + ", ".join(layer) + ")" for layer in layers])
 
 # === ÉTAPE 0 : PARSER LES RELATIONS ===
-print("="*80)
-print("ÉTAPE 0 : PARSER LES RELATIONS")
-print("="*80)
+logTitle("ÉTAPE 0 : PARSER LES RELATIONS")
 
 def extract_table_name(field_ref):
     """Extrait le nom de la table depuis une référence de champ"""
@@ -362,17 +370,15 @@ for line in relations_input.strip().split('\n'):
         b = extract_table_name(parts[1].strip())
         relations_raw.append((a, b))
 
-print(f"Relations parsees: {len(relations_raw)}")
+log(f"Relations parsees: {len(relations_raw)}")
 for a, b in relations_raw[:10]:
-    print(f"  {a} > {b}")
+    log(f"  {a} > {b}")
 if len(relations_raw) > 10:
-    print(f"  ... ({len(relations_raw) - 10} more)")
+    log(f"  ... ({len(relations_raw) - 10} more)")
 
 
 # === ÉTAPE 1 : DÉDUPLICATION ===
-print("\n" + "="*80)
-print("ÉTAPE 1 : DÉDUPLICATION")
-print("="*80)
+logTitle("ÉTAPE 1 : DÉDUPLICATION")
 
 seen_pairs = {}
 unique_relations = []
@@ -389,22 +395,20 @@ for a, b in relations_raw:
         duplicates_removed.append(f"  [DOUBLON] {a} > {b} (premier: {first[0]} > {first[1]})")
 
 relations = unique_relations
-print(f"Relations apres deduplication: {len(relations)}")
+log(f"Relations apres deduplication: {len(relations)}")
 
 if duplicates_removed:
-    print(f"\n{len(duplicates_removed)} doublon(s) supprime(s):")
+    log(f"\n{len(duplicates_removed)} doublon(s) supprime(s):")
     for dup in duplicates_removed[:5]:
-        print(dup)
+        log(dup)
     if len(duplicates_removed) > 5:
-        print(f"  ... ({len(duplicates_removed) - 5} more)")
+        log(f"  ... ({len(duplicates_removed) - 5} more)")
 else:
-    print("Aucun doublon detecte")
+    log("Aucun doublon detecte")
 
 
 # === ÉTAPE 2 : DÉTERMINER L'ORDRE DE TRAITEMENT ===
-print("\n" + "="*80)
-print("ÉTAPE 2 : ORDRE DE TRAITEMENT")
-print("="*80)
+logTitle("ÉTAPE 2 : ORDRE DE TRAITEMENT")
 
 connection_count = defaultdict(int)
 for a, b in relations:
@@ -446,15 +450,13 @@ while len(entity_order) < len(liste_regle_1):
         if b == next_entity and a not in liste_enonces and a not in entity_order:
             liste_enonces.append(a)
 
-print(f"Ordre (top 10): {' > '.join(entity_order[:10])}")
+log(f"Ordre (top 10): {' > '.join(entity_order[:10])}")
 if len(entity_order) > 10:
-    print(f"... ({len(entity_order) - 10} more)")
+    log(f"... ({len(entity_order) - 10} more)")
 
 
 # === ÉTAPE 3 : CONSTRUCTION DES CLUSTERS ===
-print("\n" + "="*80)
-print("ÉTAPE 3 : CONSTRUCTION DES CLUSTERS")
-print("="*80)
+logTitle("ÉTAPE 3 : CONSTRUCTION DES CLUSTERS")
 
 clusters = {}
 
@@ -469,28 +471,24 @@ for entity_name in entity_order:
         'right': [entity_name]
     }
 
-print(f"Clusters construits: {len(clusters)}")
+log(f"Clusters construits: {len(clusters)}")
 for entity_name in entity_order[:5]:
     cluster_left = clusters[entity_name]['left']
-    print(f"  Cluster-{entity_name}: {cluster_left} > [{entity_name}]")
+    log(f"  Cluster-{entity_name}: {cluster_left} > [{entity_name}]")
 if len(clusters) > 5:
-    print(f"  ... ({len(clusters) - 5} more)")
+    log(f"  ... ({len(clusters) - 5} more)")
 
 
 # === ÉTAPE 4.1 : BUILD CLUSTER OF ALL ELEMENTS ===
-print("\n" + "="*80)
-print("ÉTAPE 4.1 : BUILD Cluster of all elements")
-print("="*80)
+logTitle("ÉTAPE 4.1 : BUILD Cluster of all elements")
 
 for entity_name in entity_order:
     cluster_left = clusters[entity_name]['left']
-    print(f"   Cluster-{entity_name}: {cluster_left} r [{entity_name}]")
+    log(f"   Cluster-{entity_name}: {cluster_left} r [{entity_name}]")
 
 
 # === ÉTAPE 4.2 : BUILD LAYERS (PROGRESSIVE) ===
-print("\n" + "="*80)
-print("ÉTAPE 4.2 : BUILD LAYERS (SIMPLE)")
-print("="*80)
+logTitle("ÉTAPE 4.2 : BUILD LAYERS (SIMPLE)")
 
 # Define major entities to show detailed layer building
 major_entities = ['users', 'accounts', 'leads', 'opportunities', 'quotes', 'orders', 'invoices', 'payments']
@@ -499,11 +497,11 @@ for idx, major_entity in enumerate(major_entities, 1):
     if major_entity not in clusters:
         continue
 
-    print(f"\n{idx}) '{major_entity}'")
+    log(f"\n{idx}) '{major_entity}'")
 
     # Show cluster for this entity
     cluster_left = clusters[major_entity]['left']
-    print(f"   Cluster-{major_entity}: {cluster_left} r [{major_entity}]")
+    log(f"   Cluster-{major_entity}: {cluster_left} r [{major_entity}]")
 
     # Build classifier with relations involving this entity and its cluster
     classifier = LayerClassifier()
@@ -536,28 +534,28 @@ for idx, major_entity in enumerate(major_entities, 1):
             relevant_relations.append((a, b))
 
     # Add relations to classifier
-    print(f"\n   Relations pertinentes: {len(relevant_relations)}")
+    log(f"\n   Relations pertinentes: {len(relevant_relations)}")
     for left, right in relevant_relations:
         classifier.add_relation(left, right)
 
     # Build layers
-    print(f"\n   === BUILD LAYERS pour '{major_entity}' ===")
+    log(f"\n   === BUILD LAYERS pour '{major_entity}' ===")
     layers = classifier.compute_layers()
 
-    print(f"\n   === RESULTAT POUR '{major_entity}' ===")
+    log(f"\n   === RESULTAT POUR '{major_entity}' ===")
     for layer_idx, layer in enumerate(layers):
-        print(f"   Layer {layer_idx}: {layer}")
+        log(f"   Layer {layer_idx}: {layer}")
 
-    print(f"\n   {classifier}")
+    log(f"\n   {classifier}")
 
     # Statistics
-    print(f"\n   === STATISTIQUES ===")
-    print(f"   Nombre d'entites: {len(classifier.entities)}")
-    print(f"   Nombre de relations: {len(relevant_relations)}")
-    print(f"   Nombre de layers: {len(layers)}")
+    log(f"\n   === STATISTIQUES ===")
+    log(f"   Nombre d'entites: {len(classifier.entities)}")
+    log(f"   Nombre de relations: {len(relevant_relations)}")
+    log(f"   Nombre de layers: {len(layers)}")
 
     # Intercalations
-    print(f"\n   === INTERCALATIONS DETECTEES ===")
+    log(f"\n   === INTERCALATIONS DETECTEES ===")
     intercalations = []
     for (x, z) in classifier.relations:
         for y in classifier.entities:
@@ -567,30 +565,28 @@ for idx, major_entity in enumerate(major_entities, 1):
 
     if intercalations:
         for (x, y, z) in sorted(set(intercalations))[:10]:
-            print(f"     {y} entre {x} et {z}")
+            log(f"     {y} entre {x} et {z}")
         if len(set(intercalations)) > 10:
-            print(f"     ... ({len(set(intercalations)) - 10} more)")
+            log(f"     ... ({len(set(intercalations)) - 10} more)")
     else:
-        print("     Aucune intercalation")
+        log("     Aucune intercalation")
 
     # Distances > 1
-    print(f"\n   === DISTANCES > 1 ===")
+    log(f"\n   === DISTANCES > 1 ===")
     distances_gt1 = [(left, right, dist) for (left, right), dist in sorted(classifier.distances.items()) if dist > 1]
     if distances_gt1:
         for left, right, distance in distances_gt1[:10]:
-            print(f"     distance({left}, {right}) = {distance}")
+            log(f"     distance({left}, {right}) = {distance}")
         if len(distances_gt1) > 10:
-            print(f"     ... ({len(distances_gt1) - 10} more)")
+            log(f"     ... ({len(distances_gt1) - 10} more)")
     else:
-        print("     Toutes les distances = 1")
+        log("     Toutes les distances = 1")
 
-    print("\n" + "-"*80)
+    log("\n" + "-"*80)
 
 
 # === RÉSULTAT FINAL GLOBAL ===
-print("\n" + "="*80)
-print("RÉSULTAT FINAL GLOBAL - TOUTES LES ENTITÉS")
-print("="*80)
+logTitle("RÉSULTAT FINAL GLOBAL - TOUTES LES ENTITÉS")
 
 # Build final classifier with ALL relations
 final_classifier = LayerClassifier()
@@ -600,15 +596,13 @@ for left, right in relations:
 # Build final layers
 final_layers = final_classifier.compute_layers()
 
-print(f"\n=== RESULTAT AVANT RÉORGANISATION ===")
+log(f"\n=== RESULTAT AVANT RÉORGANISATION ===")
 for layer_idx, layer in enumerate(final_layers):
-    print(f"Layer {layer_idx}: {layer}")
+    log(f"Layer {layer_idx}: {layer}")
 
 
 # === ÉTAPE 6 : RÉORGANISATION VERTICALE PAR CLUSTER ===
-print("\n" + "="*80)
-print("ÉTAPE 6 : RÉORGANISATION VERTICALE")
-print("="*80)
+logTitle("ÉTAPE 6 : RÉORGANISATION VERTICALE")
 
 def reorder_layers_by_cluster(layers, relations, entity_order):
     """
@@ -701,22 +695,20 @@ def reorder_layers_by_cluster(layers, relations, entity_order):
 # Appliquer la réorganisation
 final_layers = reorder_layers_by_cluster(final_layers, relations, entity_order)
 
-print(f"\n=== RESULTAT FINAL (APRÈS RÉORGANISATION) ===")
+log(f"\n=== RESULTAT FINAL (APRÈS RÉORGANISATION) ===")
 for layer_idx, layer in enumerate(final_layers):
-    print(f"Layer {layer_idx}: {layer}")
+    log(f"Layer {layer_idx}: {layer}")
 
-print(f"\n{final_classifier}")
+log(f"\n{final_classifier}")
 
 # Final Statistics
-print(f"\n=== STATISTIQUES FINALES ===")
-print(f"Nombre total d'entites: {len(final_classifier.entities)}")
-print(f"Nombre total de relations: {len(relations)}")
-print(f"Nombre de layers: {len(final_layers)}")
+log(f"\n=== STATISTIQUES FINALES ===")
+log(f"Nombre total d'entites: {len(final_classifier.entities)}")
+log(f"Nombre total de relations: {len(relations)}")
+log(f"Nombre de layers: {len(final_layers)}")
 
 # === VISUALISATION 2D ===
-print("\n" + "="*80)
-print("VISUALISATION 2D")
-print("="*80)
+logTitle("VISUALISATION 2D")
 if final_layers:
     max_entities = max(len(layer) for layer in final_layers)
     for row in range(max_entities):
@@ -727,8 +719,5 @@ if final_layers:
                 line += f"{entity:20}"
             else:
                 line += " " * 20
-        print(line)
+        log(line)
 
-print("\n" + "="*80)
-print("ALGORITHME TERMINÉ")
-print("="*80)
