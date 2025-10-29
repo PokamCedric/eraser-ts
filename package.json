@@ -5,12 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run build:rust && tsc && vite build",
+    "build:rust": "napi build --platform --release --manifest-path rust/Cargo.toml --target-dir rust/target --output-dir src/infrastructure/layout/native",
+    "build:rust:debug": "napi build --platform --manifest-path rust/Cargo.toml --target-dir rust/target --output-dir src/infrastructure/layout/native",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui"
+  },
+  "napi": {
+    "napi.binaryName": "layer-classifier-native",
+    "targets": {
+      "defaults": true
+    }
   },
   "keywords": [
     "erp",
@@ -22,6 +30,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@napi-rs/cli": "^3.4.1",
     "typescript": "^5.3.3",
     "vite": "^7.1.9",
     "vitest": "^3.2.4"

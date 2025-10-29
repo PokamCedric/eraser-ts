@@ -47,3 +47,13 @@ coverage/
 .temp/
 .tmp/
 .claude/
+
+# Rust
+rust/target/
+rust/**/*.rs.bk
+rust/Cargo.lock
+
+# Native modules
+src/infrastructure/layout/native/*.node
+src/infrastructure/layout/native/*.d.ts
+src/infrastructure/layout/native/*.js
