@@ -1,18 +1,18 @@
 /**
- * Layer Classification Engine - Algorithme avec Floyd-Warshall Inversé
- * Based on algo7.py - Implementation complete avec détection des intercalations transitives
+ * Layer Classification Engine - Algorithme Progressif Optimisé
+ * Based on algo10.py - Progressive Step-by-Step Distance Calculation
  *
  * Phases:
- * - Phase 1 (Pré-processing): Étapes 0-3 (ce fichier)
- * - Phase 2 (Floyd-Warshall inversé): Étape 4 (LayerClassifier - fichier externe)
- * - Phase 3 (Réorganisation): Étape 5 (ce fichier)
+ * - Phase 1 (Pré-processing): Étapes 0-2 (ce fichier)
+ * - Phase 2 (Progressive calculation): Étape 3 (LayerClassifier - fichier externe)
+ * - Phase 3 (Réorganisation): Étape 4 (ce fichier)
  *
- * Documentation: docs/layer-classification-algorithm.md
+ * Documentation: docs/layer-classification-algorithm-technical-deep-dive.md
  */
 
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
-import { LayerClassifierRust } from './LayerClassifierRust';
+import { LayerClassifier } from './LayerClassifier';
 
 interface DirectedRelation {
   left: string;
@@ -170,15 +170,18 @@ export class LayerClassificationEngine {
   }
 
   /**
-   * ÉTAPE 4: Calcul des layers avec Floyd-Warshall inversé
-   * (Gérée par LayerClassifierRust)
+   * ÉTAPE 3: Calcul des layers avec algorithme progressif (algo10)
+   * (Gérée par LayerClassifier)
    */
-  private static buildLayersWithFloydWarshall(relations: DirectedRelation[]): string[][] {
-    logTitle('ÉTAPE 3 : BUILD LAYERS (FLOYD-WARSHALL INVERSÉ)');
+  private static buildLayersWithProgressiveAlgorithm(
+    relations: DirectedRelation[],
+    entityOrder: string[]
+  ): string[][] {
+    logTitle('ÉTAPE 3 : BUILD LAYERS (ALGORITHME PROGRESSIF - ALGO10)');
 
-    console.log(`\n[INFO] Utilisation de l'implémentation: LayerClassifierRust`);
+    console.log(`\n[INFO] Utilisation de l'implémentation: LayerClassifier (algo10)`);
 
-    const classifier = new LayerClassifierRust();
+    const classifier = new LayerClassifier();
 
     // Ajouter toutes les relations
     console.log(`\nAjout de ${relations.length} relations au classifier...`);
@@ -186,8 +189,8 @@ export class LayerClassificationEngine {
       classifier.addRelation(left, right);
     }
 
-    // Calculer les layers
-    const layers = classifier.computeLayers();
+    // Calculer les layers avec l'ordre de traitement
+    const layers = classifier.computeLayers(entityOrder);
 
     console.log(`\n=== RESULTAT BUILD LAYERS ===`);
     layers.forEach((layer, idx) => {
@@ -309,7 +312,7 @@ export class LayerClassificationEngine {
    * Main entry point
    */
   static layout(entities: Entity[], relationships: Relationship[]): LayerClassificationResult {
-    logTitle('LAYER CLASSIFICATION ENGINE (FLOYD-WARSHALL INVERSÉ)');
+    logTitle('LAYER CLASSIFICATION ENGINE (ALGORITHME PROGRESSIF - ALGO10)');
 
     // ÉTAPE 0: Parser les relations
     const relationsRaw = this.parseRelations(relationships);
@@ -320,10 +323,10 @@ export class LayerClassificationEngine {
     // ÉTAPE 2: Déterminer l'ordre de traitement
     const entityOrder = this.determineOrder(relations, connectionCount);
 
-    // ÉTAPE 4: Build layers avec Floyd-Warshall inversé
-    let layers = this.buildLayersWithFloydWarshall(relations);
+    // ÉTAPE 3: Build layers avec algorithme progressif
+    let layers = this.buildLayersWithProgressiveAlgorithm(relations, entityOrder);
 
-    // ÉTAPE 5: Réorganisation verticale
+    // ÉTAPE 4: Réorganisation verticale
     layers = this.reorderLayersByCluster(layers, entityOrder, relations);
 
     logTitle('LAYERS FINAUX');

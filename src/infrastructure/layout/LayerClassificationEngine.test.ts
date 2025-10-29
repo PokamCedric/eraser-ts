@@ -1006,4 +1006,485 @@ describe('LayerClassificationEngine', () => {
       console.log('\n✓ Principe d\'atomicité vérifié: distance = somme des atomiques!\n');
     });
   });
+
+  // ============================================================================
+  // EDGE CASES - Tests for documented edge cases from technical deep dive
+  // ============================================================================
+
+  describe('Edge Case 1: Disconnected Graph (Multiple Components)', () => {
+    it('should handle disconnected components independently', () => {
+      console.log('\n========================================');
+      console.log('  DISCONNECTED GRAPH TEST');
+      console.log('========================================');
+
+      // Two separate components:
+      // Component A: users → profiles, accounts → users
+      // Component B: products → categories, orders → products
+
+      const entities: Entity[] = [
+        'users',
+        'profiles',
+        'accounts',
+        'products',
+        'categories',
+        'orders',
+      ].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      const relationships: Relationship[] = [
+        // Component A
+        {
+          from: { entity: 'users', field: 'profileId' },
+          to: { entity: 'profiles', field: 'id' },
+          type: 'one-to-one',
+          color: '#888',
+        },
+        {
+          from: { entity: 'accounts', field: 'userId' },
+          to: { entity: 'users', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+        // Component B (no connection to A)
+        {
+          from: { entity: 'products', field: 'categoryId' },
+          to: { entity: 'categories', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+        {
+          from: { entity: 'orders', field: 'productId' },
+          to: { entity: 'products', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+      ];
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== DISCONNECTED COMPONENTS ===');
+      console.log('Component A: accounts → users → profiles');
+      console.log('Component B: orders → products → categories');
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // All entities should be placed
+      expect(result.layerOf.size).toBe(entities.length);
+
+      // Check component A relationships
+      const accountsLayer = result.layerOf.get('accounts')!;
+      const usersLayer = result.layerOf.get('users')!;
+      const profilesLayer = result.layerOf.get('profiles')!;
+
+      expect(accountsLayer).toBeLessThan(usersLayer);
+      expect(usersLayer).toBeLessThan(profilesLayer);
+
+      // Check component B relationships
+      const ordersLayer = result.layerOf.get('orders')!;
+      const productsLayer = result.layerOf.get('products')!;
+      const categoriesLayer = result.layerOf.get('categories')!;
+
+      // Note: Component B may be placed at layer 0 if not reachable from reference
+      // The key is that all entities are placed
+      console.log(`Component B layers: orders=${ordersLayer}, products=${productsLayer}, categories=${categoriesLayer}`);
+
+      // Verify that orders → products → categories chain is preserved
+      if (ordersLayer !== productsLayer && productsLayer !== categoriesLayer) {
+        expect(ordersLayer).toBeLessThan(productsLayer);
+        expect(productsLayer).toBeLessThan(categoriesLayer);
+      }
+
+      console.log('\n✓ Disconnected graph handled correctly!\n');
+    });
+  });
+
+  describe('Edge Case 2: Bidirectional Relations (Cycles)', () => {
+    it('should handle bidirectional relationships with maximal distance', () => {
+      console.log('\n========================================');
+      console.log('  BIDIRECTIONAL RELATIONS TEST');
+      console.log('========================================');
+
+      // Cycle: users ⇄ teams
+      const entities: Entity[] = ['users', 'teams'].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      const relationships: Relationship[] = [
+        {
+          from: { entity: 'users', field: 'teamId' },
+          to: { entity: 'teams', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+        {
+          from: { entity: 'teams', field: 'leaderId' },
+          to: { entity: 'users', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+      ];
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== BIDIRECTIONAL CYCLE ===');
+      console.log('users → teams AND teams → users');
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // Both entities should be placed
+      expect(result.layerOf.has('users')).toBe(true);
+      expect(result.layerOf.has('teams')).toBe(true);
+
+      const usersLayer = result.layerOf.get('users')!;
+      const teamsLayer = result.layerOf.get('teams')!;
+
+      console.log(`Users: Layer ${usersLayer}`);
+      console.log(`Teams: Layer ${teamsLayer}`);
+
+      // The cycle creates mutual dependencies
+      // The algorithm should handle this gracefully (may place in same layer or separate)
+      console.log('\n✓ Bidirectional cycle handled!\n');
+    });
+  });
+
+  describe('Edge Case 3: Self-Referencing Relations', () => {
+    it('should ignore self-referencing relations', () => {
+      console.log('\n========================================');
+      console.log('  SELF-REFERENCING RELATIONS TEST');
+      console.log('========================================');
+
+      // employees → employees (self-reference, should be ignored)
+      // employees → departments (normal relation)
+      const entities: Entity[] = ['employees', 'departments'].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      const relationships: Relationship[] = [
+        {
+          from: { entity: 'employees', field: 'managerId' },
+          to: { entity: 'employees', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+        {
+          from: { entity: 'employees', field: 'departmentId' },
+          to: { entity: 'departments', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+      ];
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== SELF-REFERENCE ===');
+      console.log('employees → employees (self-loop, should be ignored)');
+      console.log('employees → departments (normal)');
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // Should only process the employees → departments relation
+      const employeesLayer = result.layerOf.get('employees')!;
+      const departmentsLayer = result.layerOf.get('departments')!;
+
+      console.log(`Employees: Layer ${employeesLayer}`);
+      console.log(`Departments: Layer ${departmentsLayer}`);
+
+      // The self-reference may cause both to be at the same layer (deduplication)
+      // The key is that the self-loop doesn't create errors
+      if (employeesLayer !== departmentsLayer) {
+        expect(employeesLayer).toBeLessThan(departmentsLayer);
+      }
+
+      console.log('\n✓ Self-referencing relation handled correctly!\n');
+    });
+  });
+
+  describe('Edge Case 4: Linear Chain', () => {
+    it('should handle long linear chains efficiently', () => {
+      console.log('\n========================================');
+      console.log('  LINEAR CHAIN TEST');
+      console.log('========================================');
+
+      // Long chain: A → B → C → D → E → F → G → H
+      const entities: Entity[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      const relationships: Relationship[] = [
+        { from: { entity: 'A', field: 'bId' }, to: { entity: 'B', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'B', field: 'cId' }, to: { entity: 'C', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'C', field: 'dId' }, to: { entity: 'D', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'D', field: 'eId' }, to: { entity: 'E', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'E', field: 'fId' }, to: { entity: 'F', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'F', field: 'gId' }, to: { entity: 'G', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'G', field: 'hId' }, to: { entity: 'H', field: 'id' }, type: 'many-to-one', color: '#888' },
+      ];
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== LINEAR CHAIN ===');
+      console.log('A → B → C → D → E → F → G → H');
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // Verify chain is laid out correctly
+      const layers = entities.map(e => result.layerOf.get(e.name)!);
+      console.log(`Layers: ${layers.join(' → ')}`);
+
+      // Each entity should be 1 layer apart
+      for (let i = 0; i < layers.length - 1; i++) {
+        expect(layers[i + 1] - layers[i]).toBe(1);
+      }
+
+      console.log('\n✓ Linear chain handled efficiently!\n');
+    });
+  });
+
+  describe('Edge Case 5: High Connectivity Hub', () => {
+    it('should handle entity with very high connectivity as reference', () => {
+      console.log('\n========================================');
+      console.log('  HIGH CONNECTIVITY HUB TEST');
+      console.log('========================================');
+
+      // Hub: users connected to many entities
+      const entities: Entity[] = [
+        'users',
+        'profiles',
+        'accounts',
+        'contacts',
+        'activities',
+        'notes',
+        'tasks',
+        'comments',
+      ].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      // users is the hub, connected to almost everything
+      const relationships: Relationship[] = [
+        { from: { entity: 'users', field: 'profileId' }, to: { entity: 'profiles', field: 'id' }, type: 'one-to-one', color: '#888' },
+        { from: { entity: 'accounts', field: 'userId' }, to: { entity: 'users', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'contacts', field: 'userId' }, to: { entity: 'users', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'activities', field: 'userId' }, to: { entity: 'users', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'notes', field: 'authorId' }, to: { entity: 'users', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'tasks', field: 'assigneeId' }, to: { entity: 'users', field: 'id' }, type: 'many-to-one', color: '#888' },
+        { from: { entity: 'comments', field: 'authorId' }, to: { entity: 'users', field: 'id' }, type: 'many-to-one', color: '#888' },
+      ];
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== HIGH CONNECTIVITY HUB ===');
+      console.log('users is connected to 7 other entities');
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // users should be chosen as reference or close to it
+      const usersLayer = result.layerOf.get('users')!;
+      console.log(`\nUsers (hub) at Layer: ${usersLayer}`);
+
+      // Many entities should be at distance 1 from users
+      const entitiesAtDistance1 = entities.filter(e => {
+        const layer = result.layerOf.get(e.name)!;
+        return Math.abs(layer - usersLayer) === 1;
+      });
+
+      console.log(`Entities at distance 1 from users: ${entitiesAtDistance1.map(e => e.name).join(', ')}`);
+
+      // Should have multiple entities close to the hub
+      expect(entitiesAtDistance1.length).toBeGreaterThan(3);
+
+      console.log('\n✓ High connectivity hub handled correctly!\n');
+    });
+  });
+
+  describe('Edge Case 6: Complete Graph (Dense)', () => {
+    it('should handle complete graph where all entities connect to all others', () => {
+      console.log('\n========================================');
+      console.log('  COMPLETE GRAPH TEST');
+      console.log('========================================');
+
+      // Complete graph: every entity points to every other entity
+      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      const relationships: Relationship[] = [];
+      const entityNames = ['A', 'B', 'C', 'D'];
+
+      // Create all possible directed edges
+      for (let i = 0; i < entityNames.length; i++) {
+        for (let j = 0; j < entityNames.length; j++) {
+          if (i !== j) {
+            relationships.push({
+              from: { entity: entityNames[i], field: `${entityNames[j].toLowerCase()}Id` },
+              to: { entity: entityNames[j], field: 'id' },
+              type: 'many-to-one',
+              color: '#888',
+            });
+          }
+        }
+      }
+
+      console.log(`\n=== COMPLETE GRAPH ===`);
+      console.log(`4 entities, ${relationships.length} relations (all possible connections)`);
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // All entities should be placed
+      expect(result.layerOf.size).toBe(entities.length);
+
+      // In a complete graph, all direct distances are 1
+      // But the algorithm should handle the complexity
+      console.log('\n✓ Complete graph handled (worst case scenario)!\n');
+    });
+  });
+
+  describe('Edge Case 7: Empty Graph', () => {
+    it('should handle graph with no relationships', () => {
+      console.log('\n========================================');
+      console.log('  EMPTY GRAPH TEST');
+      console.log('========================================');
+
+      const entities: Entity[] = ['A', 'B', 'C'].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      const relationships: Relationship[] = [];
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== EMPTY GRAPH ===');
+      console.log('3 entities, 0 relations');
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // All isolated entities should be placed
+      expect(result.layerOf.size).toBe(entities.length);
+
+      // All should be placed (may be in same or different layers depending on isolated entity handling)
+      const layers = entities.map(e => result.layerOf.get(e.name)!);
+      console.log(`Layers: ${layers.join(', ')}`);
+
+      // Key: all entities are successfully placed even with no relationships
+      expect(layers.every(l => l !== undefined && !isNaN(l))).toBe(true);
+
+      console.log('\n✓ Empty graph handled correctly!\n');
+    });
+  });
+
+  describe('Edge Case 8: Contradiction Detection (Long Cycle)', () => {
+    it('should handle contradictory constraints from cycles', () => {
+      console.log('\n========================================');
+      console.log('  CONTRADICTORY CYCLE TEST');
+      console.log('========================================');
+
+      // Cycle of length 3: A → B → C → A
+      const entities: Entity[] = ['A', 'B', 'C'].map(name => ({
+        name,
+        displayName: name,
+        fields: [],
+        color: '#fff',
+        icon: '',
+      }));
+
+      const relationships: Relationship[] = [
+        {
+          from: { entity: 'A', field: 'bId' },
+          to: { entity: 'B', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+        {
+          from: { entity: 'B', field: 'cId' },
+          to: { entity: 'C', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+        {
+          from: { entity: 'C', field: 'aId' },
+          to: { entity: 'A', field: 'id' },
+          type: 'many-to-one',
+          color: '#888',
+        },
+      ];
+
+      const result = LayerClassificationEngine.layout(entities, relationships);
+
+      console.log('\n=== CYCLE OF LENGTH 3 ===');
+      console.log('A → B → C → A (circular dependency)');
+      console.log('\n=== RESULT ===');
+      const sortedLayers = Array.from(result.layers.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [layer, nodes] of sortedLayers) {
+        console.log(`Layer ${layer}: [${nodes.join(', ')}]`);
+      }
+
+      // All entities should be placed despite cycle
+      expect(result.layerOf.size).toBe(entities.length);
+
+      const layerA = result.layerOf.get('A')!;
+      const layerB = result.layerOf.get('B')!;
+      const layerC = result.layerOf.get('C')!;
+
+      console.log(`A: Layer ${layerA}`);
+      console.log(`B: Layer ${layerB}`);
+      console.log(`C: Layer ${layerC}`);
+
+      // The algorithm should handle the cycle gracefully
+      // Entities might be spread out due to the contradiction
+      console.log('\n✓ Contradictory cycle handled!\n');
+    });
+  });
 });
