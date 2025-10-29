@@ -12,7 +12,7 @@
 
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
-import { LayerClassifier } from './LayerClassifier';
+import { LayerClassifierRust } from './LayerClassifierRust';
 
 interface DirectedRelation {
   left: string;
@@ -54,9 +54,7 @@ export class LayerClassificationEngine {
     relations: DirectedRelation[];
     connectionCount: Map<string, number>;
   } {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 1 : CONSTITUER LE BACKLOG (DÉDUPLICATION)');
-    console.log('='.repeat(80));
+    logTitle('ÉTAPE 1 : CONSTITUER LE BACKLOG (DÉDUPLICATION)');
 
     // Déduplication basée sur la PAIRE d'entités (peu importe l'ordre)
     const seenPairs = new Map<string, DirectedRelation>();
@@ -108,9 +106,7 @@ export class LayerClassificationEngine {
     relations: DirectedRelation[],
     connectionCount: Map<string, number>
   ): string[] {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 2 : ORDRE DE TRAITEMENT');
-    console.log('='.repeat(80));
+    logTitle('ÉTAPE 2 : ORDRE DE TRAITEMENT');
 
     // Liste-Règle 1 (référence)
     const listeRegle1 = Array.from(connectionCount.keys()).sort(
@@ -175,14 +171,14 @@ export class LayerClassificationEngine {
 
   /**
    * ÉTAPE 4: Calcul des layers avec Floyd-Warshall inversé
-   * (Gérée par LayerClassifier)
+   * (Gérée par LayerClassifierRust)
    */
   private static buildLayersWithFloydWarshall(relations: DirectedRelation[]): string[][] {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 4 : BUILD LAYERS (FLOYD-WARSHALL INVERSÉ)');
-    console.log('='.repeat(80));
+    logTitle('ÉTAPE 3 : BUILD LAYERS (FLOYD-WARSHALL INVERSÉ)');
 
-    const classifier = new LayerClassifier();
+    console.log(`\n[INFO] Utilisation de l'implémentation: LayerClassifierRust`);
+
+    const classifier = new LayerClassifierRust();
 
     // Ajouter toutes les relations
     console.log(`\nAjout de ${relations.length} relations au classifier...`);
@@ -210,9 +206,7 @@ export class LayerClassificationEngine {
     entityOrder: string[],
     relations: DirectedRelation[]
   ): string[][] {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 5 : RÉORGANISATION VERTICALE');
-    console.log('='.repeat(80));
+    logTitle('ÉTAPE 4 : RÉORGANISATION VERTICALE');
 
     if (layers.length === 0) return layers;
 
@@ -315,9 +309,7 @@ export class LayerClassificationEngine {
    * Main entry point
    */
   static layout(entities: Entity[], relationships: Relationship[]): LayerClassificationResult {
-    console.log('\n' + '='.repeat(80));
-    console.log('LAYER CLASSIFICATION ENGINE - ALGO7 (FLOYD-WARSHALL INVERSÉ)');
-    console.log('='.repeat(80));
+    logTitle('LAYER CLASSIFICATION ENGINE (FLOYD-WARSHALL INVERSÉ)');
 
     // ÉTAPE 0: Parser les relations
     const relationsRaw = this.parseRelations(relationships);
@@ -334,9 +326,7 @@ export class LayerClassificationEngine {
     // ÉTAPE 5: Réorganisation verticale
     layers = this.reorderLayersByCluster(layers, entityOrder, relations);
 
-    console.log('\n' + '='.repeat(80));
-    console.log('RÉSULTAT FINAL');
-    console.log('='.repeat(80));
+    logTitle('LAYERS FINAUX');
     layers.forEach((layer, idx) => {
       console.log(`Layer ${idx}: [${layer.join(', ')}]`);
     });
@@ -367,3 +357,9 @@ export class LayerClassificationEngine {
     return { layers: layersMap, layerOf };
   }
 }
+function logTitle(  title: string   ) {
+  console.log('\n' + '='.repeat(80));
+  console.log(title);
+  console.log('='.repeat(80));
+}
+
