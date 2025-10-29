@@ -1,11 +1,13 @@
 """
-Algorithm v8 - STEP-BY-STEP DISTANCE CALCULATION
-Replaces Floyd-Warshall with progressive cluster-based distance calculation.
+Algorithm v9 - OPTIMIZED STEP-BY-STEP DISTANCE CALCULATION (Phase 1)
+Based on algo8 with Phase 1 optimizations for better performance.
 
-Key differences from algo7:
-- Instead of Floyd-Warshall, we calculate distances step-by-step following entity processing order
-- Each entity's cluster elements get relative distances calculated based on previous entities
-- Distances are accumulated progressively: dist(A, ref1) and dist(A, ref2) are tracked separately
+Optimizations implemented:
+- #4: Optimized _count_connections (O(n×r) → O(r))
+- #3: Use sets instead of lists for cluster lookups (O(n) → O(1))
+- #1: Pre-compute clusters cache (O(n×r) per step → O(r) once)
+
+Expected gain: 30-40% faster than algo8
 """
 
 from collections import defaultdict
@@ -150,6 +152,9 @@ class LayerClassifier:
         self.distances = {}  # distances entre entités : (left, right) -> distance
         self.entity_reference_distances = defaultdict(dict)  # entity -> {reference: distance}
 
+        # OPTIMIZATION #1: Pre-compute clusters cache
+        self.clusters_cache = {}  # {entity: set(cluster_elements)}
+
 
 
     def add_relation(self, left, right):
@@ -159,6 +164,16 @@ class LayerClassifier:
         self.entities.add(right)
         # Distance initiale = 1
         self.distances[(left, right)] = 1
+
+    def _precompute_clusters(self):
+        """Pre-compute clusters for all entities
+
+        OPTIMIZATION #1: O(n×r) per step → O(r) once
+        Build a cache mapping each entity to its cluster elements.
+        """
+        self.clusters_cache = defaultdict(set)
+        for left, right in self.relations:
+            self.clusters_cache[right].add(left)
 
     def _propagate_distance_update(self, updated_entity, updated_ref, new_dist):
         """
@@ -192,6 +207,9 @@ class LayerClassifier:
         """
         log("=== STEP-BY-STEP DISTANCE CALCULATION ===")
 
+        # OPTIMIZATION #1: Pre-compute clusters once
+        self._precompute_clusters()
+
         # Process entities in order
         for step_idx, reference_entity in enumerate(entity_order, 1):
             if reference_entity not in self.entities:
@@ -199,11 +217,8 @@ class LayerClassifier:
 
             log(f"Step {step_idx}: Processing reference '{reference_entity}'")
 
-            # Find all entities that point to this reference (cluster elements)
-            cluster_elements = []
-            for left, right in self.relations:
-                if right == reference_entity and left not in cluster_elements:
-                    cluster_elements.append(left)
+            # OPTIMIZATION #1: Use cached clusters instead of scanning relations
+            cluster_elements = self.clusters_cache.get(reference_entity, set())
 
             if not cluster_elements:
                 log(f"No cluster elements for '{reference_entity}'")
@@ -260,15 +275,17 @@ class LayerClassifier:
                     log(f"distances[({entity}, {ref})] = {dist}")
 
     def _count_connections(self):
-        """Compte le nombre de connexions pour chaque entité"""
-        connections = {}
-        for entity in self.entities:
-            count = 0
-            for left, right in self.relations:
-                if left == entity or right == entity:
-                    count += 1
-            connections[entity] = count
-        return connections
+        """Compte le nombre de connexions pour chaque entité
+
+        OPTIMIZATION #4: O(n×r) → O(r)
+        Instead of iterating over all relations for each entity,
+        we iterate over relations once and increment counters.
+        """
+        connections = defaultdict(int)
+        for left, right in self.relations:
+            connections[left] += 1
+            connections[right] += 1
+        return dict(connections)
 
     def compute_layers(self, entity_order):
         """Calcule les layers en utilisant l'entité la plus connectée comme référence

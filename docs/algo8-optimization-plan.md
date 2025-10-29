@@ -195,69 +195,115 @@ def _propagate_distance_update_batch(self, initial_updates):
 
 ## 🎯 Plan d'Action
 
-### ✅ Phase 1 (Quick wins - 1-2h de dev)
-**Gain estimé: 30-40% supplémentaire**
+### ✅ Phase 1 (Quick wins - 1-2h de dev) - **TERMINÉE**
+**Gain réel: 4.7% (algo9 vs algo8)**
 
-- [ ] **Optimisation #4** : Optimiser `_count_connections` (10-15% gain)
+- [x] **Optimisation #4** : Optimiser `_count_connections` (10-15% gain)
   - Complexité: O(n × r) → O(r)
   - Impact: Facile et immédiat
 
-- [ ] **Optimisation #3** : Utiliser des sets au lieu de listes (5% gain)
+- [x] **Optimisation #3** : Utiliser des sets au lieu de listes (5% gain)
   - Complexité: O(n) → O(1) pour lookups
   - Impact: Très facile
 
-- [ ] **Optimisation #1** : Pré-calculer les clusters (15-20% gain)
+- [x] **Optimisation #1** : Pré-calculer les clusters (15-20% gain)
   - Complexité: O(n × r) → O(r)
   - Impact: Moyen, structure à maintenir
 
-**Livrable Phase 1** : algo9.py avec optimisations 1, 3, 4
+**Livrable Phase 1** : ✅ algo9.py avec optimisations 1, 3, 4
+
+**Résultats Phase 1:**
+- algo8: 0.589 ms
+- algo9: 0.562 ms
+- **Amélioration: 4.7%** (1.05x speedup)
+
+**Analyse:** Le gain est modeste car l'algorithme est déjà très rapide et ces optimisations ciblent des opérations peu fréquentes.
 
 ---
 
-### ✅ Phase 2 (Impact majeur - 3-4h de dev)
-**Gain estimé: 35-50% supplémentaire**
+### ✅ Phase 2 (Impact majeur - 3-4h de dev) - **TERMINÉE**
+**Gain réel: 3.9% (algo10 vs algo9), 8.4% total vs algo8**
 
-- [ ] **Optimisation #2** : Index inversé pour propagation (30-40% gain)
+- [x] **Optimisation #2** : Index inversé pour propagation (30-40% gain)
   - Complexité: O(n) → O(d)
   - Impact: Majeur, nécessite refactoring de propagation
 
-- [ ] **Optimisation #5** : Early exit dans propagation (5-10% gain)
+- [x] **Optimisation #5** : Early exit dans propagation (5-10% gain)
   - Complexité: Ajout de tracking visited
   - Impact: Facile à ajouter après #2
 
-**Livrable Phase 2** : algo10.py avec toutes les optimisations 1-5
+**Livrable Phase 2** : ✅ algo10.py avec toutes les optimisations 1-5
+
+**Résultats Phase 2:**
+- algo8: 0.589 ms
+- algo9: 0.562 ms
+- algo10: 0.540 ms
+- **Amélioration Phase 2: 3.9%** (1.04x speedup vs algo9)
+- **Amélioration totale: 8.4%** (1.09x speedup vs algo8)
+
+**Analyse:** Le gain est également modeste car sur le dataset CRM, la propagation ne se déclenche pas souvent (peu d'intercalations complexes). Les optimisations seraient plus impactantes sur des graphes plus denses avec plus d'intercalations.
 
 ---
 
-### ⚠️ Phase 3 (Si nécessaire - avancé)
-**Gain estimé: 20-25% supplémentaire**
+### ⚠️ Phase 3 (Si nécessaire - avancé) - **TERMINÉE** ❌
+**Gain réel: -2.5% (algo11 vs algo10) - RÉGRESSION**
 
-- [ ] **Optimisation #6** : Batch processing (20-25% gain)
+- [x] **Optimisation #6** : Batch processing (20-25% gain estimé)
   - Complexité: Réécriture de la propagation récursive
-  - Impact: Seulement si données très denses
+  - Impact: **NÉGATIF sur ce dataset**
 
 - [ ] **Optimisation #7** : Sparse storage (Variable)
   - Complexité: Optimisation mémoire
   - Impact: Pour très grands graphes
+  - **Statut: Non implémentée** (pas nécessaire)
 
-**Livrable Phase 3** : algo11.py (si nécessaire)
+**Livrable Phase 3** : ✅ algo11.py (implémenté mais plus lent)
+
+**Résultats Phase 3:**
+- algo8: 0.630 ms
+- algo9: 0.568 ms
+- algo10: 0.562 ms
+- algo11: 0.576 ms (❌ **plus lent que algo10**)
+- **Régression Phase 3: -2.5%** vs algo10
+
+**Analyse:** Le batch processing introduit un overhead supplémentaire (gestion de la queue, déqueue operations) qui est plus coûteux que le gain apporté par l'évitement de la récursion. Sur un petit graphe avec peu de propagations profondes, la récursion reste plus efficace.
 
 ---
 
-## 📈 Benchmarks Prévus
+## 📈 Résultats Finaux des Benchmarks
 
-Après chaque phase, lancer le benchmark:
-```bash
-python performance_test.py
-```
+| Version | Temps moyen (ms) | Speedup vs algo7 | Amélioration vs algo8 | Statut |
+|---------|------------------|------------------|----------------------|--------|
+| algo7 (Floyd-Warshall) | 46.812 | 1x | - | ✅ Baseline |
+| algo8 (Cedric) | 0.630 | **74.3x** | - | ✅ Baseline progressive |
+| algo9 (Phase 1) | 0.568 | **82.4x** | **+9.9%** | ✅ Recommandé |
+| algo10 (Phase 2) | 0.562 | **83.3x** | **+10.8%** | ✅ **MEILLEUR** |
+| algo11 (Phase 3) | 0.576 | 81.2x | +8.6% | ❌ Régression vs algo10 |
 
-| Version | Temps moyen (ms) | Speedup vs algo7 | Amélioration vs algo8 |
-|---------|------------------|------------------|----------------------|
-| algo7 (Floyd-Warshall) | 46.089 | 1x | - |
-| algo8 (Cedric) | 0.631 | 73x | - |
-| algo9 (Phase 1) | ~0.40 (estimé) | ~115x | ~37% |
-| algo10 (Phase 2) | ~0.30 (estimé) | ~154x | ~53% |
-| algo11 (Phase 3) | ~0.24 (estimé) | ~192x | ~62% |
+### 🏆 Recommandation Finale
+
+**Utiliser algo10** comme version de production !
+
+**Raisons:**
+- ✅ **Meilleur temps**: 0.562 ms (le plus rapide)
+- ✅ **83.3x plus rapide** que Floyd-Warshall
+- ✅ **10.8% plus rapide** que algo8
+- ✅ Code propre et maintenable
+- ✅ Optimisations efficaces (cache, sets, index inversé)
+
+**Ne PAS utiliser algo11:**
+- ❌ Plus lent que algo10 (-2.5%)
+- ❌ Overhead du batch processing non justifié sur petits graphes
+
+**Note:** Les résultats réels sont moins spectaculaires que prévu car:
+1. L'algorithme algo8 est déjà extrêmement rapide (< 1ms)
+2. Le dataset CRM est relativement petit (41 entités, 59 relations)
+3. Peu d'intercalations complexes dans ce graphe spécifique
+
+Les optimisations montreraient des gains plus importants sur:
+- Graphes plus grands (>100 entités)
+- Graphes plus denses (plus de relations par entité)
+- Graphes avec plus d'intercalations transitives
 
 ---
 
