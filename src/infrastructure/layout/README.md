@@ -7,25 +7,26 @@ The layer classification algorithm is now organized into separate, focused modul
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│      LayerClassificationEngine (Public API)         │
-│              (Thin Wrapper)                          │
-└──────────────────┬──────────────────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│       LayerClassificationOrchestrator               │
-│              (Main Coordinator)                      │
-└──────────────────┬──────────────────────────────────┘
-                   │
-       ┌───────────┼───────────┬──────────────┐
-       │           │           │              │
-       ▼           ▼           ▼              ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│  Phase 0 │ │ Phase 1-2│ │ Phase 3  │ │ Phase 4  │
-│  Parser  │ │Preprocess│ │Horizontal│ │ Vertical │
-│ (Domain) │ │          │ │          │ │          │
-└──────────┘ └──────────┘ └──────────┘ └──────────┘
+┌─────────────────────────────────────────────────────────┐
+│        LayerClassificationEngine (Public API)           │
+│                  (Thin Wrapper)                          │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│         LayerClassificationOrchestrator                 │
+│                (Main Coordinator)                        │
+└────────────────────────┬────────────────────────────────┘
+                         │
+       ┌─────────────────┼─────────────────┬──────────────┬──────────────┐
+       │                 │                 │              │              │
+       ▼                 ▼                 ▼              ▼              ▼
+┌──────────┐      ┌──────────┐      ┌──────────┐  ┌──────────┐  ┌──────────┐
+│ Phase 0  │      │Phase 1-2 │      │ Phase 3  │  │ Phase 4  │  │ Phase 5  │
+│  Parser  │  ->  │Preprocess│  ->  │Horizontal│->│Source-   │->│ Crossing │
+│(Domain)  │      │          │      │          │  │Aware     │  │Minimize  │
+│          │      │          │      │          │  │Vertical  │  │          │
+└──────────┘      └──────────┘      └──────────┘  └──────────┘  └──────────┘
 ```
 
 ## Modules
@@ -93,30 +94,44 @@ const directPreds = DirectPredecessorAnalyzer.computeDirectPredecessors(
 // Returns: Map<string, Set<string>>
 ```
 
-### 5. `VerticalOrderOptimizer.ts` - Phase 4: Vertical Alignment
-**Class**: `VerticalOrderOptimizer`
+### 5. `SourceAwareVerticalOptimizer.ts` - Phase 4: Source-Aware Vertical Alignment
+**Class**: `SourceAwareVerticalOptimizer`
 
-Optimizes vertical order (Y-axis) within each layer to minimize edge crossings.
+Optimizes vertical order (Y-axis) using **source chains**.
 
-**Algorithm**:
-1. Process layers right to left
-2. Last layer: order by entityOrder
-3. Other layers: group by targets in next layer
-4. Sort groups to minimize crossings
+**Key Innovation:** Respects entity provenance (where they come from)
+
+**Concepts:**
+- **Direct Clusters:** Entities pointing to same target
+- **Pivots:** Entities in multiple clusters
+- **Source Chains:** Layer N-1 → Layer N → Layer N+1
 
 **Example**:
 ```typescript
-const optimizedLayers = VerticalOrderOptimizer.optimize(
-  horizontalLayers,
-  entityOrder,
-  relations
-);
+const optimizer = new SourceAwareVerticalOptimizer(relations);
+const verticalLayers = optimizer.optimize(horizontalLayers, entityOrder);
 ```
 
-### 6. `LayerClassificationOrchestrator.ts` - Main Coordinator
+### 6. `CrossingMinimizer.ts` - Phase 5: Crossing Minimization
+**Class**: `CrossingMinimizer`
+
+Minimizes edge crossings using the **barycenter method**.
+
+**Algorithm**:
+1. Forward pass: reorder based on previous layer
+2. Backward pass: reorder based on next layer
+3. Repeat N iterations, track best solution
+
+**Example**:
+```typescript
+const minimizer = new CrossingMinimizer(relations);
+const finalLayers = minimizer.minimizeCrossings(verticalLayers, 4);
+```
+
+### 7. `LayerClassificationOrchestrator.ts` - Main Coordinator
 **Class**: `LayerClassificationOrchestrator`
 
-Coordinates all phases of the layer classification pipeline.
+Coordinates all 5 phases of the layer classification pipeline.
 
 **Example**:
 ```typescript
@@ -167,14 +182,14 @@ const result = LayerClassificationEngine.layout(entities, relationships);
 src/infrastructure/layout/
 ├── README.md                                    # This file
 ├── LayerClassificationEngine.ts                 # Public API (thin wrapper)
-├── LayerClassifier.ts                           # Phase 3 (existing - algo10)
+├── LayerClassifier.ts                           # Phase 3 (algo10)
 ├── orchestrator/
-│   └── LayerClassificationOrchestrator.ts      # Main coordinator
+│   └── LayerClassificationOrchestrator.ts      # Main coordinator (5 phases)
 └── phases/
     ├── types.ts                                 # Shared types
-    ├── GraphPreprocessor.ts                     # Phase 1-2
-    ├── DirectPredecessorAnalyzer.ts            # Phase 4 prep
-    └── VerticalOrderOptimizer.ts               # Phase 4
+    ├── GraphPreprocessor.ts                     # Phase 1-2: Preprocessing
+    ├── SourceAwareVerticalOptimizer.ts         # Phase 4: Source-aware vertical
+    └── CrossingMinimizer.ts                     # Phase 5: Crossing minimization
 ```
 
 ## Key Concepts

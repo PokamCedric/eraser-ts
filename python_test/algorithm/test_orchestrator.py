@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from layer_classification_orchestrator import LayerClassificationOrchestrator
-from test_data import relations_input_1
+from test_data import relations_input_crm
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
 
     # Run orchestrator
     orchestrator = LayerClassificationOrchestrator(
-        relations_input_1,
+        relations_input_crm,
         debug=True
     )
     final_layers = orchestrator.run()

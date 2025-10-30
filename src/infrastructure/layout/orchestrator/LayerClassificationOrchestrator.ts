@@ -1,18 +1,20 @@
 /**
  * Layer Classification Orchestrator
  *
- * Main coordinator that runs all phases:
+ * Main coordinator that runs all 5 phases:
  * - Phase 0: Parsing (via DSLParserAdapter - external)
  * - Phase 1-2: Preprocessing (GraphPreprocessor)
- * - Phase 3: Horizontal alignment (LayerClassifier)
- * - Phase 4: Vertical alignment (VerticalOrderOptimizer)
+ * - Phase 3: Horizontal alignment (LayerClassifier - algo10)
+ * - Phase 4: Source-aware vertical alignment (SourceAwareVerticalOptimizer)
+ * - Phase 5: Crossing minimization (CrossingMinimizer)
  */
 
 import { Relationship } from '../../../domain/entities/Relationship';
 import { DirectedRelation } from '../phases/types';
 import { GraphPreprocessor } from '../phases/GraphPreprocessor';
 import { LayerClassifier } from '../LayerClassifier';
-import { VerticalOrderOptimizer } from '../phases/VerticalOrderOptimizer';
+import { SourceAwareVerticalOptimizer } from '../phases/SourceAwareVerticalOptimizer';
+import { CrossingMinimizer } from '../phases/CrossingMinimizer';
 
 export class LayerClassificationOrchestrator {
   /**
@@ -72,12 +74,13 @@ export class LayerClassificationOrchestrator {
       console.log(`  Layer ${idx}: [${layer.join(', ')}]`);
     });
 
-    // PHASE 4: Vertical alignment (Y-axis)
-    const finalLayers = VerticalOrderOptimizer.optimize(
-      horizontalLayers,
-      entityOrder,
-      relations
-    );
+    // PHASE 4: Source-aware vertical alignment (Y-axis)
+    const verticalOptimizer = new SourceAwareVerticalOptimizer(relations);
+    const verticalLayers = verticalOptimizer.optimize(horizontalLayers, entityOrder);
+
+    // PHASE 5: Crossing minimization
+    const crossingMinimizer = new CrossingMinimizer(relations);
+    const finalLayers = crossingMinimizer.minimizeCrossings(verticalLayers, 4);
 
     // Final result
     console.log('\n' + '='.repeat(80));

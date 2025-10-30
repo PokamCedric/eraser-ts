@@ -13,8 +13,8 @@ from typing import List, Tuple
 from relation_parser import RelationParser
 from graph_preprocessor import GraphPreprocessor
 from horizontal_layer_classifier import HorizontalLayerClassifier
-from direct_predecessor_analyzer import DirectPredecessorAnalyzer
-from vertical_order_optimizer import VerticalOrderOptimizer
+from pivot_based_vertical_optimizer_v2 import PivotBasedVerticalOptimizerV2
+from crossing_minimizer import CrossingMinimizer
 
 
 class LayerClassificationOrchestrator:
@@ -73,19 +73,18 @@ class LayerClassificationOrchestrator:
         for idx, layer in enumerate(self.horizontal_layers):
             self._log(f"  Layer {idx}: {layer}")
 
-        self._log_phase("PHASE 4: VERTICAL ALIGNMENT (Y-AXIS)")
-        self.direct_predecessors = DirectPredecessorAnalyzer.compute_direct_predecessors(
-            self.horizontal_layers,
-            self.relations
-        )
-        self._log(f"Direct predecessors computed for {len(self.direct_predecessors)} entities")
-
-        vertical_optimizer = VerticalOrderOptimizer(self.relations)
-        self.final_layers = vertical_optimizer.optimize(
+        self._log_phase("PHASE 4: SOURCE-AWARE VERTICAL ALIGNMENT (Y-AXIS)")
+        vertical_optimizer = PivotBasedVerticalOptimizerV2(self.relations)
+        vertical_layers = vertical_optimizer.optimize(
             self.horizontal_layers,
             self.entity_order
         )
-        self._log("Vertical optimization complete")
+        self._log("Source-aware vertical optimization complete")
+
+        self._log_phase("PHASE 5: CROSSING MINIMIZATION")
+        crossing_minimizer = CrossingMinimizer(self.relations)
+        self.final_layers = crossing_minimizer.minimize_crossings(vertical_layers, max_iterations=4)
+        self._log("Crossing minimization complete")
 
         self._log_phase("FINAL RESULT")
         for idx, layer in enumerate(self.final_layers):
