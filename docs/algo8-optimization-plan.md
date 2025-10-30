@@ -337,5 +337,43 @@ Les optimisations montreraient des gains plus importants sur:
 
 ---
 
-**Dernière mise à jour**: 2025-10-29
-**Prochaine étape**: Phase 1 - Quick wins
+**Dernière mise à jour**: 2025-10-30
+**Prochaine étape**: ✅ Toutes les phases terminées - algo10 recommandé
+
+---
+
+## ⚠️ Phase 4 (Mise à Jour Incrémentale) - **ABANDONNÉE**
+
+### Algo12: Incremental Updates
+
+- **Date**: 2025-10-30
+- **Objectif**: Optimiser pour visualisation ERP temps réel (add/remove relation)
+- **Approche**: Mise à jour incrémentale au lieu de recalcul complet
+- **Résultats**: ❌ **PLUS LENT que algo10**
+
+#### Résultats des Benchmarks
+
+| Opération | Algo10 (Full) | Algo12 (Incremental) | Verdict |
+|-----------|---------------|----------------------|---------|
+| Add single relation | 0.108 ms | 0.132 ms | ❌ 22% plus lent |
+| Add 5 relations | 0.578 ms | 0.592 ms | ≈ Équivalent |
+| Remove relation | 0.125 ms | 0.142 ms | ❌ 13% plus lent |
+
+#### Analyse
+
+**Pourquoi plus lent?**
+1. **Graphe trop petit** (30 entités, 42 relations)
+2. **Recalcul complet déjà ultra-rapide** (0.1ms)
+3. **Overhead de l'approche incrémentale** (propagation, tracking, cache)
+4. **Algo10 déjà optimisé** (83x plus rapide que Floyd-Warshall)
+
+**Conclusion**:
+- ❌ Ne PAS utiliser algo12 en production
+- ✅ Rester sur algo10 (0.1ms = instantané pour utilisateur)
+- 📊 Réévaluer seulement si graphe > 500 entités
+
+#### Documentation
+
+Voir: `docs/algo12-incremental-update-analysis.md`
+
+---
