@@ -10,7 +10,7 @@
  * - Sinon, un fallback vers l'implémentation TypeScript est utilisé
  */
 
-import { LayerClassifier } from './LayerClassifier';
+import { LayerClassifier } from './orchestrator/LayerClassifier';
 
 interface LayerClassifierNative {
   new(): LayerClassifierNative;

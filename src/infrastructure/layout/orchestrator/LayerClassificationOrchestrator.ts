@@ -12,9 +12,10 @@
 import { Relationship } from '../../../domain/entities/Relationship';
 import { DirectedRelation } from '../phases/types';
 import { GraphPreprocessor } from '../phases/GraphPreprocessor';
-import { LayerClassifier } from '../LayerClassifier';
+import { LayerClassifier } from './LayerClassifier';
 import { SourceAwareVerticalOptimizer } from '../phases/SourceAwareVerticalOptimizer';
 import { CrossingMinimizer } from '../phases/CrossingMinimizer';
+import { Logger } from '../utils/Logger';
 
 export class LayerClassificationOrchestrator {
   /**
@@ -23,17 +24,17 @@ export class LayerClassificationOrchestrator {
   private static parseRelations(relationships: Relationship[]): DirectedRelation[] {
     const relations: DirectedRelation[] = [];
 
-    console.log('\n=== PHASE 0: PARSING RELATIONS ===');
+    Logger.subsection('PHASE 0: PARSING RELATIONS');
 
     for (const rel of relationships) {
       const left = rel.from.entity;
       const right = rel.to.entity;
 
       relations.push({ left, right });
-      console.log(`  ${left} > ${right}`);
+      Logger.debug(`  ${left} > ${right}`);
     }
 
-    console.log(`Parsed ${relations.length} relations`);
+    Logger.debug(`Parsed ${relations.length} relations`);
 
     return relations;
   }
@@ -45,9 +46,7 @@ export class LayerClassificationOrchestrator {
    * @returns Array of layers, where each layer is an array of entity names
    */
   static classify(relationships: Relationship[]): string[][] {
-    console.log('\n' + '='.repeat(80));
-    console.log('LAYER CLASSIFICATION ORCHESTRATOR');
-    console.log('='.repeat(80));
+    Logger.section('LAYER CLASSIFICATION ORCHESTRATOR');
 
     // PHASE 0: Parse relationships
     const relationsRaw = this.parseRelations(relationships);
@@ -57,21 +56,21 @@ export class LayerClassificationOrchestrator {
     const entityOrder = GraphPreprocessor.buildEntityOrder(relations, connectionCount);
 
     // PHASE 3: Horizontal alignment (X-axis)
-    console.log('\n=== PHASE 3: HORIZONTAL ALIGNMENT (X-AXIS) ===');
-    console.log(`Using LayerClassifier (algo10)`);
+    Logger.subsection('PHASE 3: HORIZONTAL ALIGNMENT (X-AXIS)');
+    Logger.debug(`Using LayerClassifier (algo10)`);
 
     const classifier = new LayerClassifier();
 
-    console.log(`\nAdding ${relations.length} relations to classifier...`);
+    Logger.debug(`\nAdding ${relations.length} relations to classifier...`);
     for (const { left, right } of relations) {
       classifier.addRelation(left, right);
     }
 
     const horizontalLayers = classifier.computeLayers(entityOrder);
 
-    console.log(`\nHorizontal layers: ${horizontalLayers.length} layers`);
+    Logger.debug(`\nHorizontal layers: ${horizontalLayers.length} layers`);
     horizontalLayers.forEach((layer, idx) => {
-      console.log(`  Layer ${idx}: [${layer.join(', ')}]`);
+      Logger.debug(`  Layer ${idx}: [${layer.join(', ')}]`);
     });
 
     // PHASE 4: Source-aware vertical alignment (Y-axis)
@@ -83,11 +82,9 @@ export class LayerClassificationOrchestrator {
     const finalLayers = crossingMinimizer.minimizeCrossings(verticalLayers, 4);
 
     // Final result
-    console.log('\n' + '='.repeat(80));
-    console.log('FINAL LAYERS');
-    console.log('='.repeat(80));
+    Logger.section('FINAL LAYERS');
     finalLayers.forEach((layer, idx) => {
-      console.log(`Layer ${idx}: [${layer.join(', ')}]`);
+      Logger.debug(`Layer ${idx}: [${layer.join(', ')}]`);
     });
 
     return finalLayers;

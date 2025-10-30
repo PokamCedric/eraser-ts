@@ -14,6 +14,7 @@
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { LayerClassificationOrchestrator } from './orchestrator/LayerClassificationOrchestrator';
+import { Logger } from './utils/Logger';
 
 export interface LayerClassificationResult {
   layers: Map<number, string[]>;
@@ -29,9 +30,7 @@ export class LayerClassificationEngine {
    * @returns Layer classification result with layer assignments
    */
   static layout(entities: Entity[], relationships: Relationship[]): LayerClassificationResult {
-    console.log('\n' + '='.repeat(80));
-    console.log('LAYER CLASSIFICATION ENGINE (MODULAR ARCHITECTURE)');
-    console.log('='.repeat(80));
+    Logger.section('LAYER CLASSIFICATION ENGINE (MODULAR ARCHITECTURE)');
 
     // Run orchestrator to get final layers
     const layers = LayerClassificationOrchestrator.classify(relationships);
@@ -57,15 +56,13 @@ export class LayerClassificationEngine {
         }
         layersMap.get(maxLayer + 1)!.push(entity.name);
 
-        console.log(`\n[INFO] Isolated entity '${entity.name}' placed at layer ${maxLayer + 1}`);
+        Logger.info(`\n[INFO] Isolated entity '${entity.name}' placed at layer ${maxLayer + 1}`);
       }
     });
 
-    console.log('\n' + '='.repeat(80));
-    console.log('LAYOUT COMPLETE');
-    console.log('='.repeat(80));
-    console.log(`Total layers: ${layersMap.size}`);
-    console.log(`Total entities: ${entities.length}`);
+    Logger.section('LAYOUT COMPLETE');
+    Logger.debug(`Total layers: ${layersMap.size}`);
+    Logger.debug(`Total entities: ${entities.length}`);
 
     return { layers: layersMap, layerOf };
   }

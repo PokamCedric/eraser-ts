@@ -19,6 +19,7 @@
  */
 
 import { DirectedRelation } from './types';
+import { Logger } from '../utils/Logger';
 
 export class SourceAwareVerticalOptimizer {
   private relations: DirectedRelation[];
@@ -44,9 +45,7 @@ export class SourceAwareVerticalOptimizer {
     horizontalLayers: string[][],
     entityOrder: string[]
   ): string[][] {
-    console.log('\n' + '='.repeat(80));
-    console.log('PHASE 4: SOURCE-AWARE VERTICAL ALIGNMENT (Y-AXIS)');
-    console.log('='.repeat(80));
+    Logger.section('PHASE 4: SOURCE-AWARE VERTICAL ALIGNMENT (Y-AXIS)');
 
     if (horizontalLayers.length === 0) {
       return horizontalLayers;
@@ -59,8 +58,8 @@ export class SourceAwareVerticalOptimizer {
     const lastIdx = layers.length - 1;
     layers[lastIdx] = this.orderByEntityOrder(layers[lastIdx], entityOrder);
 
-    console.log(`\nLast layer ${lastIdx}: ordered by connectivity`);
-    console.log(`  ${JSON.stringify(layers[lastIdx])}`);
+    Logger.debug(`\nLast layer ${lastIdx}: ordered by connectivity`);
+    Logger.debug(`  ${JSON.stringify(layers[lastIdx])}`);
 
     // Process other layers from right to left
     for (let layerIdx = layers.length - 2; layerIdx >= 0; layerIdx--) {
@@ -68,7 +67,7 @@ export class SourceAwareVerticalOptimizer {
       const prevLayer = layerIdx > 0 ? layers[layerIdx - 1] : [];
       const nextLayer = layers[layerIdx + 1];
 
-      console.log(`\n--- Processing Layer ${layerIdx} ---`);
+      Logger.subsection(`Processing Layer ${layerIdx}`);
 
       const orderedLayer = this.orderBySourceChains(
         currentLayer,
@@ -80,9 +79,7 @@ export class SourceAwareVerticalOptimizer {
       layers[layerIdx] = orderedLayer;
     }
 
-    console.log('\n' + '='.repeat(80));
-    console.log('SOURCE-AWARE VERTICAL OPTIMIZATION COMPLETE');
-    console.log('='.repeat(80));
+    Logger.section('SOURCE-AWARE VERTICAL OPTIMIZATION COMPLETE');
 
     return layers;
   }
@@ -139,7 +136,7 @@ export class SourceAwareVerticalOptimizer {
       entityTargets.set(entity, targets);
     }
 
-    console.log(`\nSource chains (Layer ${prevLayer.length > 0 ? JSON.stringify(prevLayer) : '[]'} -> current -> ${JSON.stringify(nextLayer)}):`);
+    Logger.debug(`\nSource chains (Layer ${prevLayer.length > 0 ? JSON.stringify(prevLayer) : '[]'} -> current -> ${JSON.stringify(nextLayer)}):`);
 
     // Detect pivots (entities with multiple targets)
     const pivots = new Map<string, Set<string>>();
@@ -151,9 +148,9 @@ export class SourceAwareVerticalOptimizer {
     }
 
     if (pivots.size > 0) {
-      console.log(`\nPivots detected: ${pivots.size}`);
+      Logger.debug(`\nPivots detected: ${pivots.size}`);
       for (const [pivot, targets] of pivots.entries()) {
-        console.log(`  [${pivot}] connects ${targets.size} targets: ${JSON.stringify([...targets].sort())}`);
+        Logger.debug(`  [${pivot}] connects ${targets.size} targets: ${JSON.stringify([...targets].sort())}`);
       }
     }
 
@@ -232,7 +229,7 @@ export class SourceAwareVerticalOptimizer {
           const sources = [...entitySources.get(entity)!].sort();
           const targets = [...entityTargets.get(entity)!].sort();
           const pivotMarker = pivots.has(entity) ? '*' : '';
-          console.log(`  [${entity}${pivotMarker}] from ${JSON.stringify(sources)} -> to ${JSON.stringify(targets)}`);
+          Logger.debug(`  [${entity}${pivotMarker}] from ${JSON.stringify(sources)} -> to ${JSON.stringify(targets)}`);
         }
 
         ordered.push(...sortedGroup);
@@ -249,11 +246,11 @@ export class SourceAwareVerticalOptimizer {
         if (idxB === -1) return -1;
         return idxA - idxB;
       });
-      console.log(`\n  Entities with no sources: ${JSON.stringify(noSourceEntities)}`);
+      Logger.debug(`\n  Entities with no sources: ${JSON.stringify(noSourceEntities)}`);
       ordered.push(...noSourceEntities);
     }
 
-    console.log(`\nFinal order: ${JSON.stringify(ordered)}`);
+    Logger.debug(`\nFinal order: ${JSON.stringify(ordered)}`);
 
     return ordered;
   }

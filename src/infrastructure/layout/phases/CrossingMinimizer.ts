@@ -15,6 +15,7 @@
  */
 
 import { DirectedRelation } from './types';
+import { Logger } from '../utils/Logger';
 
 export class CrossingMinimizer {
   private relations: DirectedRelation[];
@@ -52,9 +53,7 @@ export class CrossingMinimizer {
     layers: string[][],
     maxIterations: number = 4
   ): string[][] {
-    console.log('\n' + '='.repeat(80));
-    console.log('PHASE 5: CROSSING MINIMIZATION (BARYCENTER METHOD)');
-    console.log('='.repeat(80));
+    Logger.section('PHASE 5: CROSSING MINIMIZATION (BARYCENTER METHOD)');
 
     if (layers.length <= 1) {
       return layers;
@@ -65,14 +64,14 @@ export class CrossingMinimizer {
 
     // Count initial crossings
     const initialCrossings = this.countTotalCrossings(currentLayers);
-    console.log(`\nInitial crossings: ${initialCrossings}`);
+    Logger.debug(`\nInitial crossings: ${initialCrossings}`);
 
     let bestLayers = currentLayers.map(layer => [...layer]);
     let bestCrossings = initialCrossings;
 
     // Iterative improvement
     for (let iteration = 0; iteration < maxIterations; iteration++) {
-      console.log(`\n--- Iteration ${iteration + 1} ---`);
+      Logger.subsection(`Iteration ${iteration + 1}`);
 
       // Forward pass (left to right)
       for (let layerIdx = 1; layerIdx < currentLayers.length; layerIdx++) {
@@ -100,26 +99,24 @@ export class CrossingMinimizer {
 
       // Count crossings after this iteration
       const crossings = this.countTotalCrossings(currentLayers);
-      console.log(`Crossings after iteration ${iteration + 1}: ${crossings}`);
+      Logger.debug(`Crossings after iteration ${iteration + 1}: ${crossings}`);
 
       // Track best solution
       if (crossings < bestCrossings) {
         bestCrossings = crossings;
         bestLayers = currentLayers.map(layer => [...layer]);
-        console.log(`  [IMPROVED] New best: ${bestCrossings} crossings`);
+        Logger.debug(`  [IMPROVED] New best: ${bestCrossings} crossings`);
       }
 
       // Early exit if no crossings
       if (crossings === 0) {
-        console.log('\n[SUCCESS] Zero crossings achieved!');
+        Logger.debug('\n[SUCCESS] Zero crossings achieved!');
         break;
       }
     }
 
-    console.log('\n' + '='.repeat(80));
-    console.log('CROSSING MINIMIZATION COMPLETE');
-    console.log(`Final crossings: ${bestCrossings} (reduced from ${initialCrossings})`);
-    console.log('='.repeat(80));
+    Logger.section('CROSSING MINIMIZATION COMPLETE');
+    Logger.debug(`Final crossings: ${bestCrossings} (reduced from ${initialCrossings})`);
 
     return bestLayers;
   }

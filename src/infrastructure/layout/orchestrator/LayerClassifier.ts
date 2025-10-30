@@ -23,6 +23,8 @@
  * Performance: 83.3x plus rapide que Floyd-Warshall
  */
 
+import { Logger } from '../utils/Logger';
+
 interface DirectedRelation {
   left: string;
   right: string;
@@ -279,7 +281,7 @@ export class LayerClassifier {
       }
     }
 
-    console.log(
+    Logger.debug(
       `\n[DEBUG] Entite de reference: ${referenceEntity} (${bestScore[0]} connexions, somme voisins: ${bestScore[1]})`
     );
 
@@ -339,7 +341,7 @@ export class LayerClassifier {
     }
 
     // Afficher résumé des distances
-    console.log(`\n[DEBUG] DISTANCES PAR RAPPORT A ${referenceEntity.toUpperCase()}`);
+    Logger.debug(`\n[DEBUG] DISTANCES PAR RAPPORT A ${referenceEntity.toUpperCase()}`);
     const byDistance = new Map<number, string[]>();
     for (const [entity, layer] of layers.entries()) {
       if (entity !== referenceEntity) {
@@ -354,9 +356,9 @@ export class LayerClassifier {
     const sortedDistances2 = Array.from(byDistance.keys()).sort((a, b) => a - b);
     for (const dist of sortedDistances2) {
       const direction = dist < 0 ? 'GAUCHE' : dist > 0 ? 'DROITE' : 'MEME LAYER';
-      console.log(`[DEBUG] Distance ${dist >= 0 ? '+' : ''}${dist} (${direction}):`);
+      Logger.debug(`[DEBUG] Distance ${dist >= 0 ? '+' : ''}${dist} (${direction}):`);
       for (const entity of byDistance.get(dist)!.sort()) {
-        console.log(`[DEBUG]   - ${entity}`);
+        Logger.debug(`[DEBUG]   - ${entity}`);
       }
     }
 
@@ -366,8 +368,8 @@ export class LayerClassifier {
       for (const [entity, layer] of layers.entries()) {
         layers.set(entity, layer - minLayer);
       }
-      console.log(`\n[DEBUG] Normalisation: decalage de ${-minLayer}`);
-      console.log(`[DEBUG] ${referenceEntity} est maintenant au layer ${layers.get(referenceEntity)}`);
+      Logger.debug(`\n[DEBUG] Normalisation: decalage de ${-minLayer}`);
+      Logger.debug(`[DEBUG] ${referenceEntity} est maintenant au layer ${layers.get(referenceEntity)}`);
     }
 
     // Grouper par layer

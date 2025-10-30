@@ -7,6 +7,7 @@
  */
 
 import { DirectedRelation } from './types';
+import { Logger } from '../utils/Logger';
 
 export interface PreprocessorResult {
   relations: DirectedRelation[];
@@ -25,7 +26,7 @@ export class GraphPreprocessor {
    * @returns Deduplicated relations and connection counts
    */
   static buildBacklog(relationsRaw: DirectedRelation[]): PreprocessorResult {
-    console.log('\n=== PHASE 1: DEDUPLICATION (BUILD BACKLOG) ===');
+    Logger.subsection('PHASE 1: DEDUPLICATION (BUILD BACKLOG)');
 
     // Deduplication based on entity PAIR (order-agnostic)
     const seenPairs = new Map<string, DirectedRelation>();
@@ -47,16 +48,16 @@ export class GraphPreprocessor {
       }
     }
 
-    console.log(`After deduplication: ${uniqueRelations.length} unique relations`);
+    Logger.debug(`After deduplication: ${uniqueRelations.length} unique relations`);
 
     if (duplicatesRemoved.length > 0) {
-      console.log(`\n${duplicatesRemoved.length} duplicate(s) removed:`);
-      duplicatesRemoved.slice(0, 5).forEach(dup => console.log(dup));
+      Logger.debug(`\n${duplicatesRemoved.length} duplicate(s) removed:`);
+      duplicatesRemoved.slice(0, 5).forEach(dup => Logger.debug(dup));
       if (duplicatesRemoved.length > 5) {
-        console.log(`  ... (${duplicatesRemoved.length - 5} more)`);
+        Logger.debug(`  ... (${duplicatesRemoved.length - 5} more)`);
       }
     } else {
-      console.log('No duplicates detected');
+      Logger.debug('No duplicates detected');
     }
 
     // Count connections
@@ -85,7 +86,7 @@ export class GraphPreprocessor {
     relations: DirectedRelation[],
     connectionCount: Map<string, number>
   ): string[] {
-    console.log('\n=== PHASE 2: ENTITY ORDERING ===');
+    Logger.subsection('PHASE 2: ENTITY ORDERING');
 
     // Liste-Règle 1 (reference)
     const listeRegle1 = Array.from(connectionCount.keys()).sort(
@@ -140,9 +141,9 @@ export class GraphPreprocessor {
       }
     }
 
-    console.log(`Entity order (top 10): ${entityOrder.slice(0, 10).join(' > ')}`);
+    Logger.debug(`Entity order (top 10): ${entityOrder.slice(0, 10).join(' > ')}`);
     if (entityOrder.length > 10) {
-      console.log(`  ... (${entityOrder.length - 10} more)`);
+      Logger.debug(`  ... (${entityOrder.length - 10} more)`);
     }
 
     return entityOrder;
