@@ -2,8 +2,14 @@
 Simple test script for the layer classification orchestrator
 """
 
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
+
 from layer_classification_orchestrator import LayerClassificationOrchestrator
-from test_data import relations_input_crm
+from test_data import relations_input_1
 
 
 def main():
@@ -13,7 +19,7 @@ def main():
 
     # Run orchestrator
     orchestrator = LayerClassificationOrchestrator(
-        relations_input_crm,
+        relations_input_1,
         debug=True
     )
     final_layers = orchestrator.run()

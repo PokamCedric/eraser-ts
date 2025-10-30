@@ -225,6 +225,37 @@ If A->X and A->Y:
 - **Total pipeline**: < 1ms for 30 entities, 44 relations
 - **Scalability**: Tested up to 500 entities
 
+## Running Tests
+
+### Option 1: Direct execution (easiest)
+```bash
+python python_test/algorithm/test_orchestrator.py
+```
+
+### Option 2: Using the convenience script
+```bash
+python run_python_test.py
+```
+
+### Option 3: Using Python module syntax
+```bash
+python -m python_test.algorithm.test_orchestrator
+```
+
+### Option 4: From Python code
+```python
+# Add algorithm directory to path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path('python_test/algorithm')))
+
+from layer_classification_orchestrator import LayerClassificationOrchestrator
+from test_data import relations_input_3
+
+orchestrator = LayerClassificationOrchestrator(relations_input_3, debug=True)
+final_layers = orchestrator.run()
+```
+
 ## Migration from algo13.py
 
 Old monolithic file:
@@ -235,7 +266,7 @@ orchestrator = algo13.LayerClassificationOrchestrator(dsl, debug=True)
 
 New modular imports:
 ```python
-from layer_classification_orchestrator import LayerClassificationOrchestrator
+from python_test.algorithm.layer_classification_orchestrator import LayerClassificationOrchestrator
 orchestrator = LayerClassificationOrchestrator(dsl, debug=True)
 ```
 
