@@ -11,7 +11,7 @@ Main coordinator that runs all phases:
 from typing import List, Tuple
 
 from relation_parser import RelationParser
-from graph_preprocessor import GraphPreprocessor
+from python_test.algorithm.graph_preprocessor import GraphPreprocessor
 from horizontal_layer_classifier import HorizontalLayerClassifier
 from direct_predecessor_analyzer import DirectPredecessorAnalyzer
 from vertical_order_optimizer import VerticalOrderOptimizer
