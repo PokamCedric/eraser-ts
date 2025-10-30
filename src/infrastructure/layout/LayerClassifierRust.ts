@@ -11,6 +11,7 @@
  */
 
 import { LayerClassifier } from './orchestrator/LayerClassifier';
+import { Logger } from './utils/Logger';
 
 interface LayerClassifierNative {
   new(): LayerClassifierNative;
@@ -26,9 +27,9 @@ let nativeModule: { LayerClassifier: LayerClassifierNative } | null = null;
 try {
   // @ts-ignore - Le module peut ne pas exister, c'est intentionnel
   nativeModule = require('./native/layer-classifier-native.node');
-  console.log('[LayerClassifier] Module Rust chargé avec succès 🦀');
+  Logger.info('[LayerClassifier] Module Rust chargé avec succès 🦀');
 } catch (error) {
-  console.warn('[LayerClassifier] Module Rust non disponible, utilisation du fallback TypeScript');
+  Logger.warn('[LayerClassifier] Module Rust non disponible, utilisation du fallback TypeScript');
 }
 
 /**

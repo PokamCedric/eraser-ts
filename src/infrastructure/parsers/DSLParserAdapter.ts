@@ -8,6 +8,7 @@ import { Field } from '../../domain/entities/Field';
 import { Relationship } from '../../domain/entities/Relationship';
 import { IDiagramRepository, ParseDSLResult, ParseError } from '../../domain/repositories/IDiagramRepository';
 import { addFieldToEntity } from '../../data/models/utils';
+import { Logger } from '../layout/utils/Logger';
 
 interface Metadata {
   [key: string]: string;
@@ -97,7 +98,7 @@ export class DSLParserAdapter implements IDiagramRepository {
 
   async saveDiagram(data: unknown): Promise<void> {
     // Could implement local storage or file save
-    console.log('Saving diagram:', data);
+    Logger.debug('Saving diagram:', data);
   }
 
   async loadDiagram(): Promise<unknown> {

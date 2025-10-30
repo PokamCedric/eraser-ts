@@ -11,6 +11,7 @@
 
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
+import { Logger } from './utils/Logger';
 
 // Unused interface - kept for potential future use
 // interface EdgeCrossing {
@@ -34,7 +35,7 @@ export class CrossingMinimizer {
     entities: Entity[],
     maxIterations: number = 10
   ): Map<number, string[]> {
-    console.log('=== CROSSING MINIMIZER ===');
+    Logger.section('CROSSING MINIMIZER');
 
     const optimizedLayers = new Map<number, string[]>();
     layers.forEach((entityList, layerIdx) => {
@@ -43,7 +44,7 @@ export class CrossingMinimizer {
 
     const entityMap = new Map(entities.map(e => [e.name, e]));
     let currentCrossings = this._countCrossings(optimizedLayers, relationships, entityMap);
-    console.log(`Initial crossings: ${currentCrossings}`);
+    Logger.debug(`Initial crossings: ${currentCrossings}`);
 
     let improved = true;
     let iteration = 0;
@@ -72,7 +73,7 @@ export class CrossingMinimizer {
             // Keep the swap - it improved things!
             currentCrossings = newCrossings;
             improved = true;
-            console.log(`  Iteration ${iteration}: Reduced to ${currentCrossings} crossings (swapped ${layer[i]} ↔ ${layer[i + 1]})`);
+            Logger.debug(`  Iteration ${iteration}: Reduced to ${currentCrossings} crossings (swapped ${layer[i]} ↔ ${layer[i + 1]})`);
           } else {
             // Revert the swap
             optimizedLayers.set(layerIdx, layer);
@@ -81,8 +82,8 @@ export class CrossingMinimizer {
       }
     }
 
-    console.log(`Final crossings: ${currentCrossings} (after ${iteration} iterations)`);
-    console.log('=== CROSSING MINIMIZER COMPLETE ===\n');
+    Logger.debug(`Final crossings: ${currentCrossings} (after ${iteration} iterations)`);
+    Logger.section('CROSSING MINIMIZER COMPLETE');
 
     return optimizedLayers;
   }

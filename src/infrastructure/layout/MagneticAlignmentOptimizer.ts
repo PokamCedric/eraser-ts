@@ -16,6 +16,7 @@
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { FieldOrderingAlgorithm } from './FieldOrderingAlgorithm';
+import { Logger } from './utils/Logger';
 
 export class MagneticAlignmentOptimizer {
   /**
@@ -31,13 +32,13 @@ export class MagneticAlignmentOptimizer {
     relationships: Relationship[],
     layers: Map<number, string[]>
   ): Map<number, string[]> {
-    console.log('\n=== FIELD ORDERING OPTIMIZER ===');
-    console.log('Optimizing field order within entities...\n');
+    Logger.section('FIELD ORDERING OPTIMIZER');
+    Logger.debug('Optimizing field order within entities...\n');
 
     // Optimize field ordering within entities
     FieldOrderingAlgorithm.optimize(entities, relationships, layers);
 
-    console.log('=== FIELD ORDERING COMPLETE ===\n');
+    Logger.section('FIELD ORDERING COMPLETE');
     return layers;
   }
 }

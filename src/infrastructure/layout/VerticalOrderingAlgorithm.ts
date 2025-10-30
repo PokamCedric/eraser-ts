@@ -9,6 +9,7 @@
  */
 
 import { Relationship } from '../../domain/entities/Relationship';
+import { Logger } from './utils/Logger';
 
 export class VerticalOrderingAlgorithm {
   /**
@@ -22,7 +23,7 @@ export class VerticalOrderingAlgorithm {
     layers: Map<number, string[]>,
     relationships: Relationship[]
   ): Map<number, string[]> {
-    console.log('=== VERTICAL ORDERING ALGORITHM ===');
+    Logger.section('VERTICAL ORDERING ALGORITHM');
 
     const orderedLayers = new Map<number, string[]>();
     const sortedLayerIndices = Array.from(layers.keys()).sort((a, b) => a - b);
@@ -65,11 +66,11 @@ export class VerticalOrderingAlgorithm {
     }
 
     // Log the results
-    console.log('Optimized vertical ordering:');
+    Logger.debug('Optimized vertical ordering:');
     orderedLayers.forEach((entities, layerIdx) => {
-      console.log(`  Layer ${layerIdx}: ${entities.join(', ')}`);
+      Logger.debug(`  Layer ${layerIdx}: ${entities.join(', ')}`);
     });
-    console.log('=== VERTICAL ORDERING COMPLETE ===\n');
+    Logger.section('VERTICAL ORDERING COMPLETE');
 
     return orderedLayers;
   }

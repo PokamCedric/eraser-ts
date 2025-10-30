@@ -6,6 +6,7 @@
  */
 
 import { DirectedRelation } from './types';
+import { Logger } from '../utils/Logger';
 
 export class VerticalOrderOptimizer {
   /**
@@ -27,7 +28,7 @@ export class VerticalOrderOptimizer {
     entityOrder: string[],
     relations: DirectedRelation[]
   ): string[][] {
-    console.log('\n=== PHASE 4: VERTICAL ALIGNMENT (Y-AXIS) ===');
+    Logger.section('PHASE 4: VERTICAL ALIGNMENT (Y-AXIS)');
 
     if (horizontalLayers.length === 0) return horizontalLayers;
 
@@ -69,7 +70,7 @@ export class VerticalOrderOptimizer {
       layers[layerIdx] = reordered;
     }
 
-    console.log('Vertical optimization complete');
+    Logger.debug('Vertical optimization complete');
 
     return layers;
   }

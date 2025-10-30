@@ -16,6 +16,7 @@ import { CanvasRendererAdapter } from './infrastructure/renderers/CanvasRenderer
 import { SQLExporter } from './infrastructure/exporters/SQLExporter';
 import { TypeScriptExporter } from './infrastructure/exporters/TypeScriptExporter';
 import { JSONExporter } from './infrastructure/exporters/JSONExporter';
+import { Logger } from './infrastructure/layout/utils/Logger';
 
 // Presentation
 import { AppController } from './presentation/controllers/AppController';
@@ -93,11 +94,11 @@ class Application {
 
   async start(): Promise<void> {
     try {
-      console.log('🚀 Starting ERP Visual Designer with Clean Architecture...');
+      Logger.info('🚀 Starting ERP Visual Designer with Clean Architecture...');
       await this.container.appController!.initialize();
-      console.log('✅ Application initialized successfully');
+      Logger.info('✅ Application initialized successfully');
     } catch (error) {
-      console.error('❌ Failed to initialize application:', error);
+      Logger.error('❌ Failed to initialize application:', error);
       alert('Failed to initialize application. Please check the console for details.');
     }
   }

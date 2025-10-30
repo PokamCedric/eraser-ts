@@ -4,6 +4,8 @@
  * Creates and configures Monaco editor instances
  */
 
+import { Logger } from '../../infrastructure/layout/utils/Logger';
+
 // Declare global Monaco types
 declare global {
   interface Window {
@@ -81,11 +83,11 @@ export class MonacoEditorFactory {
 
           resolve(editor);
         }, (error: any) => {
-          console.error('Failed to load Monaco Editor:', error);
+          Logger.error('Failed to load Monaco Editor:', error);
           reject(error);
         });
       } catch (error) {
-        console.error('Error configuring Monaco Editor:', error);
+        Logger.error('Error configuring Monaco Editor:', error);
         reject(error);
       }
     });

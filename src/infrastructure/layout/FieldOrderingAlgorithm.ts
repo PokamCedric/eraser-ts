@@ -17,6 +17,7 @@
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { reorderEntityFields } from '../../data/models/utils';
+import { Logger } from './utils/Logger';
 
 export class FieldOrderingAlgorithm {
   /**
@@ -31,7 +32,7 @@ export class FieldOrderingAlgorithm {
     relationships: Relationship[],
     orderedLayers: Map<number, string[]>
   ): void {
-    console.log('=== FIELD ORDERING ALGORITHM ===');
+    Logger.section('FIELD ORDERING ALGORITHM');
 
     // Build entity position map (what is the vertical position of each entity?)
     const entityVerticalPosition = new Map<string, number>();
@@ -105,11 +106,11 @@ export class FieldOrderingAlgorithm {
         // Log significant reorderings
         const originalOrder = entity.fields.map(f => f.name);
         if (JSON.stringify(originalOrder) !== JSON.stringify(fieldOrder)) {
-          console.log(`  Reordered fields in ${entity.name}:`, fieldOrder);
+          Logger.debug(`  Reordered fields in ${entity.name}:`, fieldOrder);
         }
       });
     }
 
-    console.log('=== FIELD ORDERING COMPLETE ===\n');
+    Logger.section('FIELD ORDERING COMPLETE');
   }
 }

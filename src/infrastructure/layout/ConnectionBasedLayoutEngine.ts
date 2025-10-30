@@ -8,6 +8,7 @@
 
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
+import { Logger } from './utils/Logger';
 
 interface DirectedRelation {
   left: string;
@@ -32,16 +33,16 @@ export class ConnectionBasedLayoutEngine {
   private static parseRelations(relationships: Relationship[]): DirectedRelation[] {
     const relations: DirectedRelation[] = [];
 
-    console.log('\n=== ÉTAPE 0 : PARSER LES RELATIONS ===');
+    Logger.subsection('ÉTAPE 0 : PARSER LES RELATIONS');
     for (const rel of relationships) {
       const left = rel.from.entity;
       const right = rel.to.entity;
 
       relations.push({ left, right });
-      console.log(`  ${left} > ${right}`);
+      Logger.debug(`  ${left} > ${right}`);
     }
 
-    console.log(`Relations parsées: ${relations.length}`);
+    Logger.debug(`Relations parsées: ${relations.length}`);
     return relations;
   }
 
@@ -54,9 +55,7 @@ export class ConnectionBasedLayoutEngine {
     relations: DirectedRelation[];
     connectionCount: Map<string, number>;
   } {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 1 : CONSTITUER LE BACKLOG');
-    console.log('='.repeat(80));
+    Logger.section('ÉTAPE 1 : CONSTITUER LE BACKLOG');
 
     // Déduplication
     const seenRelations = new Set<string>();
@@ -70,7 +69,7 @@ export class ConnectionBasedLayoutEngine {
       }
     }
 
-    console.log(`Relations après déduplication: ${uniqueRelations.length}`);
+    Logger.debug(`Relations après déduplication: ${uniqueRelations.length}`);
 
     // Comptage des connexions
     const connectionCount = new Map<string, number>();
@@ -93,9 +92,7 @@ export class ConnectionBasedLayoutEngine {
     relations: DirectedRelation[],
     connectionCount: Map<string, number>
   ): string[] {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 2 : ORDRE DE TRAITEMENT');
-    console.log('='.repeat(80));
+    Logger.section('ÉTAPE 2 : ORDRE DE TRAITEMENT');
 
     // Liste-Règle 1 (référence)
     const listeRegle1 = Array.from(connectionCount.keys()).sort(
@@ -151,7 +148,7 @@ export class ConnectionBasedLayoutEngine {
       }
     }
 
-    console.log(`Ordre: ${entityOrder.join(' > ')}`);
+    Logger.debug(`Ordre: ${entityOrder.join(' > ')}`);
     return entityOrder;
   }
 
@@ -256,9 +253,7 @@ export class ConnectionBasedLayoutEngine {
     clusters: Map<string, Cluster>,
     relations: DirectedRelation[]
   ): string[][] {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 4 : BUILD LAYERS (SIMPLE)');
-    console.log('='.repeat(80));
+    Logger.section('ÉTAPE 4 : BUILD LAYERS (SIMPLE)');
 
     const layers: string[][] = [];
 
@@ -268,8 +263,8 @@ export class ConnectionBasedLayoutEngine {
       const cluster = clusters.get(entityName);
       if (!cluster) continue;
 
-      console.log(`\n${iteration + 1}) '${entityName}'`);
-      console.log(`   Cluster: ${JSON.stringify(cluster.left)} > ${JSON.stringify(cluster.right)}`);
+      Logger.debug(`\n${iteration + 1}) '${entityName}'`);
+      Logger.debug(`   Cluster: ${JSON.stringify(cluster.left)} > ${JSON.stringify(cluster.right)}`);
 
       const clusterLeft = [...cluster.left];
 
@@ -281,7 +276,7 @@ export class ConnectionBasedLayoutEngine {
         const parentLayer = this.findLayerIndex(layers, parent);
         if (parentLayer !== null) {
           maxParentLayer = Math.max(maxParentLayer, parentLayer);
-          console.log(`   Parent '${parent}' en Layer ${parentLayer}`);
+          Logger.debug(`   Parent '${parent}' en Layer ${parentLayer}`);
         } else {
           unplacedParents.push(parent);
         }
@@ -316,7 +311,7 @@ export class ConnectionBasedLayoutEngine {
                 } else {
                   layers[layerIdx].push(parent);
                 }
-                console.log(`      '${parent}' placé au Layer ${layerIdx}`);
+                Logger.debug(`      '${parent}' placé au Layer ${layerIdx}`);
                 maxParentLayer = Math.max(maxParentLayer, layerIdx);
                 parentPlaced = true;
                 break;
@@ -326,7 +321,7 @@ export class ConnectionBasedLayoutEngine {
             // Si pas placé, insérer un nouveau layer à gauche
             if (!parentPlaced) {
               layers.unshift([parent]);
-              console.log(`      '${parent}' placé au nouveau Layer 0 (insertion à gauche)`);
+              Logger.debug(`      '${parent}' placé au nouveau Layer 0 (insertion à gauche)`);
               maxParentLayer = maxParentLayer >= 0 ? maxParentLayer + 1 : 0;
             }
           }
@@ -348,7 +343,7 @@ export class ConnectionBasedLayoutEngine {
         const requiredLayer = finalMaxParent + 1;
 
         if (entityCurrentLayer < requiredLayer) {
-          console.log(
+          Logger.debug(
             `   -> '${entityName}' doit être déplacé de Layer ${entityCurrentLayer} vers Layer ${requiredLayer} (avec cascade)`
           );
 
@@ -378,8 +373,8 @@ export class ConnectionBasedLayoutEngine {
 
           // Calculer le décalage nécessaire
           const shift = requiredLayer - entityCurrentLayer;
-          console.log(`      Entites a deplacer en cascade (avec clusters): ${JSON.stringify(entitiesToMove)}`);
-          console.log(`      Decalage: +${shift} layers`);
+          Logger.debug(`      Entites a deplacer en cascade (avec clusters): ${JSON.stringify(entitiesToMove)}`);
+          Logger.debug(`      Decalage: +${shift} layers`);
 
           // Déplacer toutes les entités concernées
           for (const entityToMove of entitiesToMove) {
@@ -398,7 +393,7 @@ export class ConnectionBasedLayoutEngine {
                 layers.push([]);
               }
               layers[newPos].push(entityToMove);
-              console.log(`      '${entityToMove}' deplace: Layer ${currentPos} -> Layer ${newPos}`);
+              Logger.debug(`      '${entityToMove}' deplace: Layer ${currentPos} -> Layer ${newPos}`);
             }
           }
         }
@@ -406,13 +401,13 @@ export class ConnectionBasedLayoutEngine {
         // Continue pour afficher les layers
       } else if (entityAlreadyPlaced) {
         // Entity déjà placé et pas de parents à placer
-        console.log(`   -> Déjà placé, skip`);
+        Logger.debug(`   -> Déjà placé, skip`);
         continue;
       } else {
         // Entity pas encore placé
         // Si on a des parents non placés, on doit les placer d'abord (cluster complet)
         if (unplacedParents.length > 0) {
-          console.log(`   -> Placement des parents non placés: ${JSON.stringify(unplacedParents)}`);
+          Logger.debug(`   -> Placement des parents non placés: ${JSON.stringify(unplacedParents)}`);
 
           // Placer tous les parents non placés
           for (const parent of unplacedParents) {
@@ -429,7 +424,7 @@ export class ConnectionBasedLayoutEngine {
                   } else {
                     layers[layerIdx].push(parent);
                   }
-                  console.log(`      '${parent}' placé au Layer ${layerIdx}`);
+                  Logger.debug(`      '${parent}' placé au Layer ${layerIdx}`);
                   maxParentLayer = Math.max(maxParentLayer, layerIdx);
                   parentPlaced = true;
                   break;
@@ -439,7 +434,7 @@ export class ConnectionBasedLayoutEngine {
               // Si pas placé (tous les layers ont conflit), insérer un nouveau layer à gauche
               if (!parentPlaced) {
                 layers.unshift([parent]);
-                console.log(`      '${parent}' placé au nouveau Layer 0 (insertion à gauche)`);
+                Logger.debug(`      '${parent}' placé au nouveau Layer 0 (insertion à gauche)`);
                 maxParentLayer = maxParentLayer >= 0 ? maxParentLayer + 1 : 0;
                 maxParentLayer = Math.max(maxParentLayer, 0);
               }
@@ -460,7 +455,7 @@ export class ConnectionBasedLayoutEngine {
               layers[layerIdx].push(entityName);
             }
             placed = true;
-            console.log(`   -> '${entityName}' placé au Layer ${layerIdx}`);
+            Logger.debug(`   -> '${entityName}' placé au Layer ${layerIdx}`);
             break;
           }
         }
@@ -468,14 +463,14 @@ export class ConnectionBasedLayoutEngine {
         if (!placed) {
           // Ne devrait jamais arriver
           layers.push([entityName]);
-          console.log(`   -> Nouveau Layer ${layers.length - 1}`);
+          Logger.debug(`   -> Nouveau Layer ${layers.length - 1}`);
         }
       }
 
       // Afficher les layers après placement
-      console.log(`\n   Layers après placement:`);
+      Logger.debug(`\n   Layers après placement:`);
       layers.forEach((layer, idx) => {
-        console.log(`     Layer ${idx}: ${JSON.stringify(layer)}`);
+        Logger.debug(`     Layer ${idx}: ${JSON.stringify(layer)}`);
       });
     }
 
@@ -491,9 +486,7 @@ export class ConnectionBasedLayoutEngine {
     entityOrder: string[],
     relations: DirectedRelation[]
   ): string[][] {
-    console.log('\n' + '='.repeat(80));
-    console.log('ÉTAPE 6 : RÉORGANISATION VERTICALE');
-    console.log('='.repeat(80));
+    Logger.section('ÉTAPE 6 : RÉORGANISATION VERTICALE');
 
     if (layers.length === 0) return layers;
 
@@ -592,11 +585,9 @@ export class ConnectionBasedLayoutEngine {
     // ÉTAPE 6: Réorganisation verticale
     layers = this.reorderLayersByCluster(layers, entityOrder, relations);
 
-    console.log('\n' + '='.repeat(80));
-    console.log('RÉSULTAT FINAL');
-    console.log('='.repeat(80));
+    Logger.section('RÉSULTAT FINAL');
     layers.forEach((layer, idx) => {
-      console.log(`Layer ${idx}: ${JSON.stringify(layer)}`);
+      Logger.debug(`Layer ${idx}: ${JSON.stringify(layer)}`);
     });
 
     // Build result maps

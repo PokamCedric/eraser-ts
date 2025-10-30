@@ -14,6 +14,7 @@
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
+import { Logger } from './utils/Logger';
 
 // Unused interface - kept for potential future use
 // interface FieldYPosition {
@@ -51,7 +52,7 @@ export class FieldAlignmentOptimizer {
     entityHeaderHeight: number,
     entityFieldHeight: number
   ): void {
-    console.log('=== FIELD ALIGNMENT OPTIMIZER ===');
+    Logger.section('FIELD ALIGNMENT OPTIMIZER');
 
     const entityMap = new Map(entities.map(e => [e.name, e]));
     const sortedLayerIndices = Array.from(orderedLayers.keys()).sort((a, b) => a - b);
@@ -72,7 +73,7 @@ export class FieldAlignmentOptimizer {
       );
     }
 
-    console.log('=== FIELD ALIGNMENT COMPLETE ===\n');
+    Logger.section('FIELD ALIGNMENT COMPLETE');
   }
 
   /**
@@ -182,7 +183,7 @@ export class FieldAlignmentOptimizer {
       // Log significant adjustments
       const adjustment = Math.abs(finalY - adj.currentY);
       if (adjustment > 5) {
-        console.log(`  Aligned ${adj.entityName}: ${adj.currentY.toFixed(0)} → ${finalY.toFixed(0)} (shift: ${adjustment.toFixed(0)}px)`);
+        Logger.debug(`  Aligned ${adj.entityName}: ${adj.currentY.toFixed(0)} → ${finalY.toFixed(0)} (shift: ${adjustment.toFixed(0)}px)`);
       }
     });
   }

@@ -11,6 +11,7 @@ import { LayerClassificationEngine } from '../layout/LayerClassificationEngine';
 import { LayoutPositioner } from '../layout/LayoutPositioner';
 import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
 import { getRelationshipCardinality } from '../../data/models/utils';
+import { Logger } from '../layout/utils/Logger';
 
 interface MousePosition {
   x: number;
@@ -206,12 +207,11 @@ export class CanvasRendererAdapter implements IRenderer {
    * Log debug information about the layout
    */
   private _logLayoutDebugInfo(layers: Map<number, string[]>): void {
-    console.groupCollapsed('🧭 Auto Layout Layers (Left → Right)');
-    console.log(`Number of layers detected: ${layers.size}`);
+    Logger.debug('🧭 Auto Layout Layers (Left → Right)');
+    Logger.debug(`Number of layers detected: ${layers.size}`);
     for (const [i, names] of Array.from(layers.entries()).sort((a, b) => a[0] - b[0])) {
-      console.log(`Layer ${i}: ${names.join(', ')}`);
+      Logger.debug(`Layer ${i}: ${names.join(', ')}`);
     }
-    console.groupEnd();
   }
 
   getZoomLevel(): number {
