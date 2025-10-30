@@ -1,0 +1,384 @@
+================================================================================
+ÉTAPE 0 : PARSER LES RELATIONS
+================================================================================
+Relations parsees: 48
+  users > profiles
+  user_roles > users
+  user_roles > roles
+  role_permissions > roles
+  role_permissions > permissions
+  team_members > teams
+  team_members > users
+  teams > users
+  contacts > accounts
+  contacts_accounts > contacts
+  ... (38 more)
+
+================================================================================
+ÉTAPE 1 : CONSTITUER LE BACKLOG
+================================================================================
+Relations après déduplication: 44
+
+4 doublon(s) supprimé(s):
+  [DOUBLON] activities > users (premier: activities > users)
+  [DOUBLON] activity_assignments > users (premier: activity_assignments > users)
+  [DOUBLON] profiles > users (premier: users > profiles)
+  [DOUBLON] accounts > opportunities (premier: opportunities > accounts)
+
+================================================================================
+ÉTAPE 2 : ORDRE DE TRAITEMENT
+================================================================================
+Ordre: users > accounts > contacts > opportunities > leads > campaign_members > quotes > orders > invoices > cases > user_roles > roles > role_permissions > team_members > teams > contacts_accounts > campaigns > opportunity_products > payments > activities > activity_assignments > notes > attachments > profiles > permissions > pipelines > products > emails > audit_logs > api_keys
+
+================================================================================
+ÉTAPE 3 : CONSTRUCTION DES CLUSTERS
+================================================================================
+Clusters construits: 30
+  Cluster-users: ['user_roles', 'team_members', 'teams', 'accounts', 'leads', 'opportunities', 'activities', 'activity_assignments', 'cases', 'notes', 'attachments', 'audit_logs', 'api_keys'] r [users]
+  Cluster-accounts: ['contacts', 'contacts_accounts', 'opportunities', 'quotes', 'orders', 'invoices', 'payments', 'cases', 'emails'] r [accounts]
+  Cluster-contacts: ['contacts_accounts', 'campaign_members', 'opportunities', 'cases'] r [contacts]
+  Cluster-opportunities: ['opportunity_products', 'quotes'] r [opportunities]
+  Cluster-leads: ['campaign_members'] r [leads]
+  Cluster-campaign_members: [] r [campaign_members]
+  Cluster-quotes: ['orders'] r [quotes]
+  Cluster-orders: ['invoices'] r [orders]
+  Cluster-invoices: ['payments'] r [invoices]
+  Cluster-cases: [] r [cases]
+  ... (20 more)
+
+================================================================================
+ÉTAPE 4.1 : BUILD Cluster of all elements
+================================================================================
+orignal cluster are every left elements of an entity. the choosen entity is the reference.
+
+   Cluster-users: ['user_roles', 'team_members', 'teams', 'accounts', 'leads', 'opportunities', 'activities', 'activity_assignments', 'cases', 'notes', 'attachments', 'audit_logs', 'api_keys'] r [users]
+   Cluster-accounts: ['contacts', 'contacts_accounts', 'opportunities', 'quotes', 'orders', 'invoices', 'payments', 'cases', 'emails'] r [accounts]
+   Cluster-contacts: ['contacts_accounts', 'campaign_members', 'opportunities', 'cases'] r [contacts]
+   Cluster-opportunities: ['opportunity_products', 'quotes'] r [opportunities]
+   Cluster-leads: ['campaign_members'] r [leads]
+   Cluster-campaign_members: [] r [campaign_members]
+   Cluster-quotes: ['orders'] r [quotes]
+   Cluster-orders: ['invoices'] r [orders]
+   Cluster-invoices: ['payments'] r [invoices]
+   Cluster-cases: [] r [cases]
+   Cluster-user_roles: [] r [user_roles]
+   Cluster-roles: ['user_roles', 'role_permissions'] r [roles]
+   Cluster-role_permissions: [] r [role_permissions]
+   Cluster-team_members: [] r [team_members]
+   Cluster-teams: ['team_members'] r [teams]
+   ...
+
+================================================================================
+ÉTAPE 4.2 : CALCULATE ALL RELATIVE DISTANCES
+================================================================================
+base on clusters we give each entities the a distance relativ to its reference.
+So all the left elements would have a initial distance from its reference.
+
+
+[DEBUG] === STEP-BY-STEP DISTANCE CALCULATION ===
+
+[DEBUG] Step 1: Processing reference 'users'
+[DEBUG]   Cluster elements: ['user_roles', 'team_members', 'teams', 'accounts', 'leads', 'opportunities', 'activities', 'activity_assignments', 'cases', 'notes', 'attachments', 'audit_logs', 'api_keys']
+[DEBUG]     dist(user_roles, users) = 1
+[DEBUG]     dist(team_members, users) = 1
+[DEBUG]     dist(teams, users) = 1
+[DEBUG]     dist(accounts, users) = 1
+[DEBUG]     dist(leads, users) = 1
+[DEBUG]     dist(opportunities, users) = 1
+[DEBUG]     dist(activities, users) = 1
+[DEBUG]     dist(activity_assignments, users) = 1
+[DEBUG]     dist(cases, users) = 1
+[DEBUG]     dist(notes, users) = 1
+[DEBUG]     dist(attachments, users) = 1
+[DEBUG]     dist(audit_logs, users) = 1
+[DEBUG]     dist(api_keys, users) = 1
+
+[DEBUG] Step 2: Processing reference 'accounts'
+[DEBUG]   Cluster elements: ['contacts', 'contacts_accounts', 'opportunities', 'quotes', 'orders', 'invoices', 'payments', 'cases', 'emails']
+[DEBUG]     dist(contacts, accounts) = 1
+[DEBUG]     dist(contacts, users) = 2 (via accounts)
+[DEBUG]     => contacts distances: [1, 2] to [accounts, users]
+[DEBUG]     dist(contacts_accounts, accounts) = 1
+[DEBUG]     dist(contacts_accounts, users) = 2 (via accounts)
+[DEBUG]     => contacts_accounts distances: [1, 2] to [accounts, users]
+[DEBUG]     dist(opportunities, accounts) = 1
+[DEBUG]     dist(opportunities, users) = 1 -> 2 (via accounts) [MORE INTERCALATIONS]
+[DEBUG]     => opportunities distances: [2, 1] to [users, accounts]
+[DEBUG]     dist(quotes, accounts) = 1
+[DEBUG]     dist(quotes, users) = 2 (via accounts)
+[DEBUG]     => quotes distances: [1, 2] to [accounts, users]
+[DEBUG]     dist(orders, accounts) = 1
+[DEBUG]     dist(orders, users) = 2 (via accounts)
+[DEBUG]     => orders distances: [1, 2] to [accounts, users]
+[DEBUG]     dist(invoices, accounts) = 1
+[DEBUG]     dist(invoices, users) = 2 (via accounts)
+[DEBUG]     => invoices distances: [1, 2] to [accounts, users]
+[DEBUG]     dist(payments, accounts) = 1
+[DEBUG]     dist(payments, users) = 2 (via accounts)
+[DEBUG]     => payments distances: [1, 2] to [accounts, users]
+[DEBUG]     dist(cases, accounts) = 1
+[DEBUG]     dist(cases, users) = 1 -> 2 (via accounts) [MORE INTERCALATIONS]
+[DEBUG]     => cases distances: [2, 1] to [users, accounts]
+[DEBUG]     dist(emails, accounts) = 1
+[DEBUG]     dist(emails, users) = 2 (via accounts)
+[DEBUG]     => emails distances: [1, 2] to [accounts, users]
+
+[DEBUG] Step 3: Processing reference 'contacts'
+[DEBUG]   Cluster elements: ['contacts_accounts', 'campaign_members', 'opportunities', 'cases']
+[DEBUG]     dist(contacts_accounts, contacts) = 1
+[DEBUG]     dist(contacts_accounts, accounts) = 1 -> 2 (via contacts) [MORE INTERCALATIONS]
+[DEBUG]     dist(contacts_accounts, users) = 2 -> 3 (via contacts) [MORE INTERCALATIONS]
+[DEBUG]     => contacts_accounts distances: [2, 3, 1] to [accounts, users, contacts]
+[DEBUG]     dist(campaign_members, contacts) = 1
+[DEBUG]     dist(campaign_members, accounts) = 2 (via contacts)
+[DEBUG]     dist(campaign_members, users) = 3 (via contacts)
+[DEBUG]     => campaign_members distances: [1, 2, 3] to [contacts, accounts, users]
+[DEBUG]     dist(opportunities, contacts) = 1
+[DEBUG]     dist(opportunities, accounts) = 1 -> 2 (via contacts) [MORE INTERCALATIONS]
+[DEBUG]     dist(opportunities, users) = 2 -> 3 (via contacts) [MORE INTERCALATIONS]
+[DEBUG]     => opportunities distances: [3, 2, 1] to [users, accounts, contacts]
+[DEBUG]     dist(cases, contacts) = 1
+[DEBUG]     dist(cases, accounts) = 1 -> 2 (via contacts) [MORE INTERCALATIONS]
+[DEBUG]     dist(cases, users) = 2 -> 3 (via contacts) [MORE INTERCALATIONS]
+[DEBUG]     => cases distances: [3, 2, 1] to [users, accounts, contacts]
+
+[DEBUG] Step 4: Processing reference 'opportunities'
+[DEBUG]   Cluster elements: ['opportunity_products', 'quotes']
+[DEBUG]     dist(opportunity_products, opportunities) = 1
+[DEBUG]     dist(opportunity_products, users) = 4 (via opportunities)
+[DEBUG]     dist(opportunity_products, accounts) = 3 (via opportunities)
+[DEBUG]     dist(opportunity_products, contacts) = 2 (via opportunities)
+[DEBUG]     => opportunity_products distances: [1, 4, 3, 2] to [opportunities, users, accounts, contacts]
+[DEBUG]     dist(quotes, opportunities) = 1
+[DEBUG]     dist(quotes, users) = 2 -> 4 (via opportunities) [MORE INTERCALATIONS]
+[DEBUG]     dist(quotes, accounts) = 1 -> 3 (via opportunities) [MORE INTERCALATIONS]
+[DEBUG]     dist(quotes, contacts) = 2 (via opportunities)
+[DEBUG]     => quotes distances: [3, 4, 1, 2] to [accounts, users, opportunities, contacts]
+
+[DEBUG] Step 5: Processing reference 'leads'
+[DEBUG]   Cluster elements: ['campaign_members']
+[DEBUG]     dist(campaign_members, leads) = 1
+[DEBUG]     => campaign_members distances: [1, 2, 3, 1] to [contacts, accounts, users, leads]
+
+[DEBUG] Step 6: Processing reference 'campaign_members'
+[DEBUG]   No cluster elements for 'campaign_members'
+
+[DEBUG] Step 7: Processing reference 'quotes'
+[DEBUG]   Cluster elements: ['orders']
+[DEBUG]     dist(orders, quotes) = 1
+[DEBUG]     dist(orders, accounts) = 1 -> 4 (via quotes) [MORE INTERCALATIONS]
+[DEBUG]     dist(orders, users) = 2 -> 5 (via quotes) [MORE INTERCALATIONS]
+[DEBUG]     dist(orders, opportunities) = 2 (via quotes)
+[DEBUG]     dist(orders, contacts) = 3 (via quotes)
+[DEBUG]     => orders distances: [4, 5, 1, 2, 3] to [accounts, users, quotes, opportunities, contacts]
+
+[DEBUG] Step 8: Processing reference 'orders'
+[DEBUG]   Cluster elements: ['invoices']
+[DEBUG]     dist(invoices, orders) = 1
+[DEBUG]     dist(invoices, accounts) = 1 -> 5 (via orders) [MORE INTERCALATIONS]
+[DEBUG]     dist(invoices, users) = 2 -> 6 (via orders) [MORE INTERCALATIONS]
+[DEBUG]     dist(invoices, quotes) = 2 (via orders)
+[DEBUG]     dist(invoices, opportunities) = 3 (via orders)
+[DEBUG]     dist(invoices, contacts) = 4 (via orders)
+[DEBUG]     => invoices distances: [5, 6, 1, 2, 3, 4] to [accounts, users, orders, quotes, opportunities, contacts]
+
+[DEBUG] Step 9: Processing reference 'invoices'
+[DEBUG]   Cluster elements: ['payments']
+[DEBUG]     dist(payments, invoices) = 1
+[DEBUG]     dist(payments, accounts) = 1 -> 6 (via invoices) [MORE INTERCALATIONS]
+[DEBUG]     dist(payments, users) = 2 -> 7 (via invoices) [MORE INTERCALATIONS]
+[DEBUG]     dist(payments, orders) = 2 (via invoices)
+[DEBUG]     dist(payments, quotes) = 3 (via invoices)
+[DEBUG]     dist(payments, opportunities) = 4 (via invoices)
+[DEBUG]     dist(payments, contacts) = 5 (via invoices)
+[DEBUG]     => payments distances: [6, 7, 1, 2, 3, 4, 5] to [accounts, users, invoices, orders, quotes, opportunities, contacts]
+
+[DEBUG] Step 10: Processing reference 'cases'
+[DEBUG]   No cluster elements for 'cases'
+
+[DEBUG] Step 11: Processing reference 'user_roles'
+[DEBUG]   No cluster elements for 'user_roles'
+
+[DEBUG] Step 12: Processing reference 'roles'
+[DEBUG]   Cluster elements: ['user_roles', 'role_permissions']
+[DEBUG]     dist(user_roles, roles) = 1
+[DEBUG]     => user_roles distances: [1, 1] to [users, roles]
+[DEBUG]     dist(role_permissions, roles) = 1
+
+[DEBUG] Step 13: Processing reference 'role_permissions'
+[DEBUG]   No cluster elements for 'role_permissions'
+
+[DEBUG] Step 14: Processing reference 'team_members'
+[DEBUG]   No cluster elements for 'team_members'
+
+[DEBUG] Step 15: Processing reference 'teams'
+[DEBUG]   Cluster elements: ['team_members']
+[DEBUG]     dist(team_members, teams) = 1
+[DEBUG]     dist(team_members, users) = 1 -> 2 (via teams) [MORE INTERCALATIONS]
+[DEBUG]     => team_members distances: [2, 1] to [users, teams]
+
+[DEBUG] Step 16: Processing reference 'contacts_accounts'
+[DEBUG]   No cluster elements for 'contacts_accounts'
+
+[DEBUG] Step 17: Processing reference 'campaigns'
+[DEBUG]   Cluster elements: ['leads', 'campaign_members']
+[DEBUG]     dist(leads, campaigns) = 1
+[DEBUG]     => leads distances: [1, 1] to [users, campaigns]
+[DEBUG]     dist(campaign_members, campaigns) = 1
+[DEBUG]     => campaign_members distances: [1, 2, 3, 1, 1] to [contacts, accounts, users, leads, campaigns]
+
+[DEBUG] Step 18: Processing reference 'opportunity_products'
+[DEBUG]   No cluster elements for 'opportunity_products'
+
+[DEBUG] Step 19: Processing reference 'payments'
+[DEBUG]   No cluster elements for 'payments'
+
+[DEBUG] Step 20: Processing reference 'activities'
+[DEBUG]   Cluster elements: ['activity_assignments']
+[DEBUG]     dist(activity_assignments, activities) = 1
+[DEBUG]     dist(activity_assignments, users) = 1 -> 2 (via activities) [MORE INTERCALATIONS]
+[DEBUG]     => activity_assignments distances: [2, 1] to [users, activities]
+
+[DEBUG] Step 21: Processing reference 'activity_assignments'
+[DEBUG]   No cluster elements for 'activity_assignments'
+
+[DEBUG] Step 22: Processing reference 'notes'
+[DEBUG]   Cluster elements: ['contacts']
+[DEBUG]     dist(contacts, notes) = 1
+[DEBUG]     => contacts distances: [1, 2, 1] to [accounts, users, notes]
+
+[DEBUG] Step 23: Processing reference 'attachments'
+[DEBUG]   Cluster elements: ['accounts']
+[DEBUG]     dist(accounts, attachments) = 1
+[DEBUG]     dist(accounts, users) = 1 -> 2 (via attachments) [MORE INTERCALATIONS]
+[DEBUG]     => accounts distances: [2, 1] to [users, attachments]
+
+[DEBUG] Step 24: Processing reference 'profiles'
+[DEBUG]   Cluster elements: ['users']
+[DEBUG]     dist(users, profiles) = 1
+
+[DEBUG] Step 25: Processing reference 'permissions'
+[DEBUG]   Cluster elements: ['role_permissions']
+[DEBUG]     dist(role_permissions, permissions) = 1
+[DEBUG]     => role_permissions distances: [1, 1] to [roles, permissions]
+
+[DEBUG] Step 26: Processing reference 'pipelines'
+[DEBUG]   Cluster elements: ['opportunities']
+[DEBUG]     dist(opportunities, pipelines) = 1
+[DEBUG]     => opportunities distances: [3, 2, 1, 1] to [users, accounts, contacts, pipelines]
+
+[DEBUG] Step 27: Processing reference 'products'
+[DEBUG]   Cluster elements: ['opportunity_products']
+[DEBUG]     dist(opportunity_products, products) = 1
+[DEBUG]     => opportunity_products distances: [1, 4, 3, 2, 1] to [opportunities, users, accounts, contacts, products]
+
+[DEBUG] Step 28: Processing reference 'emails'
+[DEBUG]   No cluster elements for 'emails'
+
+[DEBUG] Step 29: Processing reference 'audit_logs'
+[DEBUG]   No cluster elements for 'audit_logs'
+
+[DEBUG] Step 30: Processing reference 'api_keys'
+[DEBUG]   No cluster elements for 'api_keys'
+
+[DEBUG] === DISTANCES DICT KEPT AS DIRECT RELATIONS ONLY ===
+
+[DEBUG] Entite de reference: users (14 connexions, somme voisins: 40)
+
+[DEBUG] === Relations triees par connectivite ===
+[DEBUG] 1. accounts(11) r users(14) = 25 connexions
+[DEBUG] 2. opportunities(6) r users(14) = 20 connexions
+[DEBUG] 3. contacts(6) r accounts(11) = 17 connexions
+[DEBUG] 4. leads(3) r users(14) = 17 connexions
+[DEBUG] 5. opportunities(6) r accounts(11) = 17 connexions
+[DEBUG] 6. cases(3) r users(14) = 17 connexions
+[DEBUG] 7. user_roles(2) r users(14) = 16 connexions
+[DEBUG] 8. team_members(2) r users(14) = 16 connexions
+[DEBUG] 9. teams(2) r users(14) = 16 connexions
+[DEBUG] 10. activities(2) r users(14) = 16 connexions
+[DEBUG] 11. activity_assignments(2) r users(14) = 16 connexions
+[DEBUG] 12. notes(2) r users(14) = 16 connexions
+[DEBUG] 13. attachments(2) r users(14) = 16 connexions
+[DEBUG] 14. users(14) r profiles(1) = 15 connexions
+[DEBUG] 15. audit_logs(1) r users(14) = 15 connexions
+
+[DEBUG] ========================================
+[DEBUG] DISTANCES PAR RAPPORT A USERS
+[DEBUG] ========================================
+[DEBUG] Distance -1 (GAUCHE):
+[DEBUG]   - activity_assignments
+[DEBUG]   - api_keys
+[DEBUG]   - audit_logs
+[DEBUG]   - campaign_members
+[DEBUG]   - cases
+[DEBUG]   - contacts_accounts
+[DEBUG]   - emails
+[DEBUG]   - opportunity_products
+[DEBUG]   - payments
+[DEBUG]   - role_permissions
+[DEBUG]   - team_members
+[DEBUG]   - user_roles
+[DEBUG] Distance +0 (MEME LAYER):
+[DEBUG]   - accounts
+[DEBUG]   - activities
+[DEBUG]   - contacts
+[DEBUG]   - invoices
+[DEBUG]   - leads
+[DEBUG]   - opportunities
+[DEBUG]   - orders
+[DEBUG]   - permissions
+[DEBUG]   - products
+[DEBUG]   - quotes
+[DEBUG]   - roles
+[DEBUG]   - teams
+[DEBUG] Distance +1 (DROITE):
+[DEBUG]   - attachments
+[DEBUG]   - campaigns
+[DEBUG]   - notes
+[DEBUG]   - pipelines
+[DEBUG]   - profiles
+
+[DEBUG] Normalisation: decalage de 1
+[DEBUG] users est maintenant au layer 1
+
+=== RESULTAT AVANT RÉORGANISATION ===
+Layer 0: ['activity_assignments', 'api_keys', 'audit_logs', 'campaign_members', 'cases', 'contacts_accounts', 'emails', 'opportunity_products', 'payments', 'role_permissions', 'team_members', 'user_roles']
+Layer 1: ['accounts', 'activities', 'contacts', 'invoices', 'leads', 'opportunities', 'orders', 'permissions', 'products', 'quotes', 'roles', 'teams', 'users']
+Layer 2: ['attachments', 'campaigns', 'notes', 'pipelines', 'profiles']
+
+================================================================================
+ÉTAPE 6 : RÉORGANISATION VERTICALE
+================================================================================
+
+=== RESULTAT FINAL (APRÈS RÉORGANISATION) ===
+Layer 0: ['payments', 'user_roles', 'role_permissions', 'team_members', 'activity_assignments', 'opportunity_products', 'campaign_members', 'cases', 'contacts_accounts', 'emails', 'audit_logs', 'api_keys']
+Layer 1: ['quotes', 'orders', 'invoices', 'roles', 'teams', 'activities', 'permissions', 'products', 'leads', 'contacts', 'accounts', 'users', 'opportunities']
+Layer 2: ['campaigns', 'notes', 'attachments', 'profiles', 'pipelines']
+
+(payments, user_roles, role_permissions, team_members, activity_assignments, opportunity_products, campaign_members, cases, contacts_accounts, emails, audit_logs, api_keys) - (quotes, orders, invoices, roles, teams, activities, permissions, products, leads, contacts, accounts, users, opportunities) - (campaigns, notes, attachments, profiles, pipelines)
+
+=== STATISTIQUES FINALES ===
+Nombre total d'entites: 30
+Nombre total de relations: 44
+Nombre de layers: 3
+
+================================================================================
+VISUALISATION 2D
+================================================================================
+payments            quotes              campaigns           
+user_roles          orders              notes               
+role_permissions    invoices            attachments         
+team_members        roles               profiles            
+activity_assignmentsteams               pipelines           
+opportunity_productsactivities                              
+campaign_members    permissions                             
+cases               products                                
+contacts_accounts   leads                                   
+emails              contacts                                
+audit_logs          accounts                                
+api_keys            users                                   
+                    opportunities                           
+
+================================================================================
+ALGORITHME TERMINÉ
+================================================================================
