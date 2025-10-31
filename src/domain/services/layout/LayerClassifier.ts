@@ -93,6 +93,7 @@ export class LayerClassifier implements ILayerClassifier {
 
   /**
    * OPTIMIZATION #2 + #5: Propagation avec index inversé et early exit
+   * REFACTORED: Iterative implementation (no recursion) using BFS queue
    *
    * Quand la distance d'une entité vers une référence est mise à jour,
    * propage cette mise à jour à toutes les entités dépendantes.
@@ -100,42 +101,54 @@ export class LayerClassifier implements ILayerClassifier {
    * @param updatedEntity - Entité dont la distance a été mise à jour
    * @param updatedRef - Référence concernée
    * @param newDist - Nouvelle distance
-   * @param visited - Set pour éviter les cycles (OPTIMIZATION #5)
    */
   private propagateDistanceUpdate(
     updatedEntity: string,
     updatedRef: string,
-    newDist: number,
-    visited: Set<string> = new Set()
+    newDist: number
   ): void {
-    // OPTIMIZATION #5: Early exit si déjà traité
-    const propagationKey = `${updatedEntity}→${updatedRef}→${newDist}`;
-    if (visited.has(propagationKey)) {
-      return; // Déjà propagé
+    // Use a queue for iterative BFS instead of recursion
+    interface PropagationItem {
+      entity: string;
+      ref: string;
+      dist: number;
     }
-    visited.add(propagationKey);
 
-    // OPTIMIZATION #2: Uniquement itérer sur les dépendants effectifs
-    const dependents = this.dependentsIndex.get(updatedEntity);
-    if (!dependents) return;
+    const queue: PropagationItem[] = [{ entity: updatedEntity, ref: updatedRef, dist: newDist }];
+    const visited = new Set<string>();
 
-    for (const entity of dependents) {
-      const entityDistances = this.entityReferenceDistances.get(entity);
-      if (!entityDistances || !entityDistances.has(updatedEntity)) continue;
+    while (queue.length > 0) {
+      const current = queue.shift()!;
 
-      const distToUpdated = entityDistances.get(updatedEntity)!;
-      const inheritedDist = distToUpdated + newDist;
+      // OPTIMIZATION #5: Early exit si déjà traité
+      const propagationKey = `${current.entity}→${current.ref}→${current.dist}`;
+      if (visited.has(propagationKey)) {
+        continue; // Déjà propagé
+      }
+      visited.add(propagationKey);
 
-      // Mettre à jour si nouveau chemin plus long (plus d'intercalations)
-      const currentDist = entityDistances.get(updatedRef);
-      if (currentDist === undefined) {
-        entityDistances.set(updatedRef, inheritedDist);
-        // Propager récursivement
-        this.propagateDistanceUpdate(entity, updatedRef, inheritedDist, visited);
-      } else if (inheritedDist > currentDist) {
-        entityDistances.set(updatedRef, inheritedDist);
-        // Propager récursivement
-        this.propagateDistanceUpdate(entity, updatedRef, inheritedDist, visited);
+      // OPTIMIZATION #2: Uniquement itérer sur les dépendants effectifs
+      const dependents = this.dependentsIndex.get(current.entity);
+      if (!dependents) continue;
+
+      for (const entity of dependents) {
+        const entityDistances = this.entityReferenceDistances.get(entity);
+        if (!entityDistances || !entityDistances.has(current.entity)) continue;
+
+        const distToUpdated = entityDistances.get(current.entity)!;
+        const inheritedDist = distToUpdated + current.dist;
+
+        // Mettre à jour si nouveau chemin plus long (plus d'intercalations)
+        const currentDist = entityDistances.get(current.ref);
+        if (currentDist === undefined) {
+          entityDistances.set(current.ref, inheritedDist);
+          // Add to queue instead of recursive call
+          queue.push({ entity, ref: current.ref, dist: inheritedDist });
+        } else if (inheritedDist > currentDist) {
+          entityDistances.set(current.ref, inheritedDist);
+          // Add to queue instead of recursive call
+          queue.push({ entity, ref: current.ref, dist: inheritedDist });
+        }
       }
     }
   }
