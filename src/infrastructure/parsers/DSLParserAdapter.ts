@@ -65,7 +65,8 @@ export class DSLParserAdapter implements IDiagramRepository {
         else if (currentEntity) {
           const field = this.fieldParser.parse(line);
           if (field) {
-            addFieldToEntity(currentEntity, field);
+            // LSP: addFieldToEntity now returns new entity (immutable)
+            currentEntity = addFieldToEntity(currentEntity, field);
           }
         }
       }

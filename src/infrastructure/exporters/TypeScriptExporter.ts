@@ -2,19 +2,22 @@
  * Infrastructure: TypeScript Exporter
  *
  * Exports entities to TypeScript interfaces
+ *
+ * LSP Compliant: Implements IExporter with ExportResult return type
  */
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
+import { IExporter, ExportResult } from '../../application/use-cases/ExportCodeUseCase';
 import { TypeScriptTypeMapper } from './TypeMapper';
 
-export class TypeScriptExporter {
+export class TypeScriptExporter implements IExporter {
   private typeMapper: TypeScriptTypeMapper;
 
   constructor() {
     this.typeMapper = new TypeScriptTypeMapper();
   }
 
-  export(entities: Entity[], _relationships: Relationship[]): string {
+  export(entities: Entity[], _relationships: Relationship[]): ExportResult {
     let ts = '// Generated TypeScript Interfaces\n\n';
 
     for (const entity of entities) {

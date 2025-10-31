@@ -2,10 +2,12 @@
  * Application Service: DiagramService
  *
  * Orchestrates use cases for diagram operations
+ *
+ * LSP Compliant: exportCode now returns ExportResult instead of just string
  */
 import { ParseDSLUseCase, ParseDSLResult } from '../use-cases/ParseDSLUseCase';
 import { RenderDiagramUseCase } from '../use-cases/RenderDiagramUseCase';
-import { ExportCodeUseCase } from '../use-cases/ExportCodeUseCase';
+import { ExportCodeUseCase, ExportResult } from '../use-cases/ExportCodeUseCase';
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 
@@ -54,7 +56,7 @@ export class DiagramService {
     return this.renderDiagramUseCase.getZoomLevel();
   }
 
-  exportCode(format: string): string {
+  exportCode(format: string): ExportResult {
     return this.exportCodeUseCase.execute(format, this.currentEntities, this.currentRelationships);
   }
 

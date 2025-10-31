@@ -22,16 +22,18 @@ import { Logger } from '../../../infrastructure/utils/Logger';
 export class FieldOrderingAlgorithm {
   /**
    * Optimize field ordering within all entities
+   * LSP Compliant: Returns new entities instead of mutating
    *
    * @param entities - All entities
    * @param relationships - All relationships
    * @param orderedLayers - Layers with entities already ordered vertically
+   * @returns Map of entity name to optimized entity
    */
   static optimize(
     entities: Entity[],
     relationships: Relationship[],
     orderedLayers: Map<number, string[]>
-  ): void {
+  ): Map<string, Entity> {
     Logger.section('FIELD ORDERING ALGORITHM');
 
     // Build entity position map (what is the vertical position of each entity?)
@@ -42,10 +44,15 @@ export class FieldOrderingAlgorithm {
       });
     });
 
+    // Build entity map for immutable updates
+    const entityMap = new Map<string, Entity>(
+      entities.map(e => [e.name, e])
+    );
+
     // Multiple passes for convergence
     // Each pass reorders fields based on current entity positions
     for (let pass = 0; pass < 3; pass++) {
-      entities.forEach(entity => {
+      entityMap.forEach((entity, entityName) => {
         const fieldConnectionPositions = new Map<string, number[]>();
 
         // For each field, find the vertical positions of entities it connects to
@@ -100,17 +107,21 @@ export class FieldOrderingAlgorithm {
           })
           .map(f => f.name);
 
-        // Apply the new field order
-        reorderEntityFields(entity, fieldOrder);
+        // Apply the new field order (LSP: returns new entity)
+        const reorderedEntity = reorderEntityFields(entity, fieldOrder);
 
         // Log significant reorderings
         const originalOrder = entity.fields.map(f => f.name);
         if (JSON.stringify(originalOrder) !== JSON.stringify(fieldOrder)) {
           Logger.debug(`  Reordered fields in ${entity.name}:`, fieldOrder);
         }
+
+        // Update entity map with reordered entity
+        entityMap.set(entityName, reorderedEntity);
       });
     }
 
     Logger.section('FIELD ORDERING COMPLETE');
+    return entityMap;
   }
 }

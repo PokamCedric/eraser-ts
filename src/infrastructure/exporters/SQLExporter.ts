@@ -2,19 +2,22 @@
  * Infrastructure: SQL Exporter
  *
  * Exports entities to SQL DDL
+ *
+ * LSP Compliant: Implements IExporter with ExportResult return type
  */
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
+import { IExporter, ExportResult } from '../../application/use-cases/ExportCodeUseCase';
 import { SQLTypeMapper } from './TypeMapper';
 
-export class SQLExporter {
+export class SQLExporter implements IExporter {
   private typeMapper: SQLTypeMapper;
 
   constructor() {
     this.typeMapper = new SQLTypeMapper();
   }
 
-  export(entities: Entity[], relationships: Relationship[]): string {
+  export(entities: Entity[], relationships: Relationship[]): ExportResult {
     let sql = '-- Generated SQL DDL\n\n';
 
     for (const entity of entities) {

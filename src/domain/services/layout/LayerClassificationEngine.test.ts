@@ -16,6 +16,17 @@ import { LayerClassificationEngine } from './LayerClassificationEngine';
 import { Entity } from '../../entities/Entity';
 import { Relationship } from '../../entities/Relationship';
 
+// Helper function to create test entities (LSP compliant)
+function createTestEntity(name: string): Entity {
+  return new Entity({
+    name,
+    displayName: name.charAt(0).toUpperCase() + name.slice(1),
+    fields: [],
+    color: '#fff',
+    icon: '',
+  });
+}
+
 describe('LayerClassificationEngine', () => {
   describe('Test 1: Intercalation Detection (Transitive Distances)', () => {
     it('should detect transitive intercalations with Floyd-Warshall', () => {
@@ -33,13 +44,7 @@ describe('LayerClassificationEngine', () => {
         'teams',
         'posts',
         'users',
-      ].map(name => ({
-        name,
-        displayName: name.charAt(0).toUpperCase() + name.slice(1),
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      ].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -123,13 +128,7 @@ describe('LayerClassificationEngine', () => {
         'emails',
         'audit_logs',
         'api_keys',
-      ].map(name => ({
-        name,
-        displayName: name.charAt(0).toUpperCase() + name.slice(1),
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      ].map(createTestEntity);
 
       const relationships: Relationship[] = [
         // USER/ORGANIZATION
@@ -235,13 +234,7 @@ describe('LayerClassificationEngine', () => {
       // Simple chain: A → B → C → D
       // Distance(A, D) = 1 + 1 + 1 = 3
 
-      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -300,13 +293,7 @@ describe('LayerClassificationEngine', () => {
       //   A → D (distance 1 direct)
       // Expected: distance(A, D) = 2 (intercalations B and C)
 
-      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -373,13 +360,7 @@ describe('LayerClassificationEngine', () => {
       //   X → A → B → Y (via path, distance 3)
       // Expected: distance(X, Y) = 3 (MAX)
 
-      const entities: Entity[] = ['X', 'Y', 'A', 'B'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['X', 'Y', 'A', 'B'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -435,13 +416,7 @@ describe('LayerClassificationEngine', () => {
       console.log('  VERTICAL REORGANIZATION TEST');
       console.log('========================================');
 
-      const entities: Entity[] = ['A', 'B', 'C', 'target1', 'target2'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C', 'target1', 'target2'].map(createTestEntity);
 
       // Layer 0: A, B, C
       // Layer 1: target1, target2
@@ -513,13 +488,7 @@ describe('LayerClassificationEngine', () => {
         'connected1',
         'connected2',
         'isolated',
-      ].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      ].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -550,13 +519,7 @@ describe('LayerClassificationEngine', () => {
       console.log('  DEDUPLICATION TEST');
       console.log('========================================');
 
-      const entities: Entity[] = ['A', 'B'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B'].map(createTestEntity);
 
       // Same relation declared multiple times
       const relationships: Relationship[] = [
@@ -603,13 +566,7 @@ describe('LayerClassificationEngine', () => {
       console.log('========================================');
 
       // Create scenario where multiple entities have same connection count
-      const entities: Entity[] = ['A', 'B', 'C', 'D', 'E'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C', 'D', 'E'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         // A has 2 connections
@@ -679,13 +636,7 @@ describe('LayerClassificationEngine', () => {
       //
       // L'algorithme doit découvrir que AD peut se décomposer en AB + BC + CD
 
-      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         // Relation directe A → D
@@ -759,13 +710,7 @@ describe('LayerClassificationEngine', () => {
       // Classique choisirait: distance(S, T) = 1 (MIN)
       // Inversé choisit: distance(S, T) = 3 (MAX)
 
-      const entities: Entity[] = ['S', 'A', 'B', 'T'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['S', 'A', 'B', 'T'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         // Chemin court: S → T (distance = 1)
@@ -839,13 +784,7 @@ describe('LayerClassificationEngine', () => {
       //   1. Thalès inversé: découvre les décompositions possibles
       //   2. Floyd-Warshall inversé: choisit le MAX = 3
 
-      const entities: Entity[] = ['X', 'Y', 'A', 'B', 'C'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['X', 'Y', 'A', 'B', 'C'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         // Chemin 1: X → Y (distance = 1)
@@ -938,13 +877,7 @@ describe('LayerClassificationEngine', () => {
       // Chaîne: E1 → E2 → E3 → E4 → E5
       // Distance(E1, E5) = 1 + 1 + 1 + 1 = 4
 
-      const entities: Entity[] = ['E1', 'E2', 'E3', 'E4', 'E5'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['E1', 'E2', 'E3', 'E4', 'E5'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -1028,13 +961,7 @@ describe('LayerClassificationEngine', () => {
         'products',
         'categories',
         'orders',
-      ].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      ].map(createTestEntity);
 
       const relationships: Relationship[] = [
         // Component A
@@ -1113,13 +1040,7 @@ describe('LayerClassificationEngine', () => {
       console.log('========================================');
 
       // Cycle: users ⇄ teams
-      const entities: Entity[] = ['users', 'teams'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['users', 'teams'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -1170,13 +1091,7 @@ describe('LayerClassificationEngine', () => {
 
       // employees → employees (self-reference, should be ignored)
       // employees → departments (normal relation)
-      const entities: Entity[] = ['employees', 'departments'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['employees', 'departments'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {
@@ -1228,13 +1143,7 @@ describe('LayerClassificationEngine', () => {
       console.log('========================================');
 
       // Long chain: A → B → C → D → E → F → G → H
-      const entities: Entity[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         { from: { entity: 'A', field: 'bId' }, to: { entity: 'B', field: 'id' }, type: 'many-to-one', color: '#888' },
@@ -1285,13 +1194,7 @@ describe('LayerClassificationEngine', () => {
         'notes',
         'tasks',
         'comments',
-      ].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      ].map(createTestEntity);
 
       // users is the hub, connected to almost everything
       const relationships: Relationship[] = [
@@ -1340,13 +1243,7 @@ describe('LayerClassificationEngine', () => {
       console.log('========================================');
 
       // Complete graph: every entity points to every other entity
-      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C', 'D'].map(createTestEntity);
 
       const relationships: Relationship[] = [];
       const entityNames = ['A', 'B', 'C', 'D'];
@@ -1391,13 +1288,7 @@ describe('LayerClassificationEngine', () => {
       console.log('  EMPTY GRAPH TEST');
       console.log('========================================');
 
-      const entities: Entity[] = ['A', 'B', 'C'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C'].map(createTestEntity);
 
       const relationships: Relationship[] = [];
 
@@ -1432,13 +1323,7 @@ describe('LayerClassificationEngine', () => {
       console.log('========================================');
 
       // Cycle of length 3: A → B → C → A
-      const entities: Entity[] = ['A', 'B', 'C'].map(name => ({
-        name,
-        displayName: name,
-        fields: [],
-        color: '#fff',
-        icon: '',
-      }));
+      const entities: Entity[] = ['A', 'B', 'C'].map(createTestEntity);
 
       const relationships: Relationship[] = [
         {

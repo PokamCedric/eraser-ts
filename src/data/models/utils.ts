@@ -100,10 +100,12 @@ export function getEntityField(entity: Entity, fieldName: string): Field | undef
 
 /**
  * Reorder fields in an entity based on a new order array
+ * LSP Compliant: Returns new entity instead of mutating
  * @param entity The entity to reorder fields in
  * @param newOrder Array of field names in desired order
+ * @returns New entity with reordered fields
  */
-export function reorderEntityFields(entity: Entity, newOrder: string[]): void {
+export function reorderEntityFields(entity: Entity, newOrder: string[]): Entity {
     const orderedFields: Field[] = [];
     const fieldMap = new Map(entity.fields.map(f => [f.name, f]));
 
@@ -121,14 +123,18 @@ export function reorderEntityFields(entity: Entity, newOrder: string[]): void {
         orderedFields.push(field);
     }
 
-    entity.fields = orderedFields;
+    return entity.withFields(orderedFields);
 }
 
 /**
  * Add a field to an entity
+ * LSP Compliant: Returns new entity instead of mutating
+ * @param entity The entity to add field to
+ * @param field The field to add
+ * @returns New entity with added field
  */
-export function addFieldToEntity(entity: Entity, field: Field): void {
-    entity.fields.push(field);
+export function addFieldToEntity(entity: Entity, field: Field): Entity {
+    return entity.withField(field);
 }
 
 /**

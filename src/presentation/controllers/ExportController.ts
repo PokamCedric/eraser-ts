@@ -3,9 +3,12 @@
  *
  * Manages code export functionality.
  * Follows Single Responsibility Principle (SRP).
+ *
+ * LSP Compliant: Handles ExportResult (string | Blob | Uint8Array)
  */
 
 import { DiagramService } from '../../application/services/DiagramService';
+import { ExportResult } from '../../application/use-cases/ExportCodeUseCase';
 
 export interface ExportFormat {
   id: string;
@@ -53,7 +56,7 @@ export class ExportController {
     }
   }
 
-  private _getExportContent(formatId: string, getCurrentDSL: () => string): string {
+  private _getExportContent(formatId: string, getCurrentDSL: () => string): ExportResult {
     switch (formatId) {
       case 'dsl':
         return getCurrentDSL();
@@ -68,8 +71,20 @@ export class ExportController {
     }
   }
 
-  private _downloadFile(content: string, extension: string): void {
-    const blob = new Blob([content], { type: 'text/plain' });
+  private _downloadFile(content: ExportResult, extension: string): void {
+    // Convert ExportResult to Blob
+    let blob: Blob;
+
+    if (content instanceof Blob) {
+      blob = content;
+    } else if (content instanceof Uint8Array) {
+      // Convert Uint8Array to BlobPart
+      blob = new Blob([content as BlobPart], { type: 'application/octet-stream' });
+    } else {
+      // String content
+      blob = new Blob([content], { type: 'text/plain' });
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

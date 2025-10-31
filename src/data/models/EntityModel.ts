@@ -2,6 +2,10 @@
  * Data Model: EntityModel
  *
  * Extends Entity with business logic methods
+ *
+ * NOTE: Since Entity is now immutable (LSP compliant), this class
+ * only provides additional helper methods. Mutation methods have
+ * been removed - use Entity.withField() and Entity.withFields() instead.
  */
 
 import { Entity, EntityProps } from '../../domain/entities/Entity';
@@ -13,37 +17,8 @@ export class EntityModel extends Entity {
         super(props);
     }
 
-    addField(field: Field): void {
-        this.fields.push(field);
-    }
-
     getField(fieldName: string): Field | undefined {
         return this.fields.find(f => f.name === fieldName);
-    }
-
-    /**
-     * Reorder fields based on a new order array
-     * @param newOrder Array of field names in desired order
-     */
-    reorderFields(newOrder: string[]): void {
-        const orderedFields: Field[] = [];
-        const fieldMap = new Map(this.fields.map(f => [f.name, f]));
-
-        // Add fields in the specified order
-        for (const fieldName of newOrder) {
-            const field = fieldMap.get(fieldName);
-            if (field) {
-                orderedFields.push(field);
-                fieldMap.delete(fieldName);
-            }
-        }
-
-        // Add any remaining fields that weren't in newOrder
-        for (const field of fieldMap.values()) {
-            orderedFields.push(field);
-        }
-
-        this.fields = orderedFields;
     }
 
     getPrimaryKey(): Field | undefined {

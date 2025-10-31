@@ -180,16 +180,20 @@ export class CanvasRendererAdapter implements IRenderer {
     const { layers } = LayerClassificationEngine.layout(this.entities, this.relationships);
 
     // Step 7: Field ordering within entities (only reorder fields, not entities)
-    const finalLayers = MagneticAlignmentOptimizer.optimize(
+    // LSP: MagneticAlignmentOptimizer now returns both layers and optimized entities
+    const { layers: finalLayers, entities: optimizedEntities } = MagneticAlignmentOptimizer.optimize(
       this.entities,
       this.relationships,
       layers
     );
 
+    // Update entities with optimized field ordering
+    this.entities = optimizedEntities;
+
     // Step 8: Calculate positions based on optimized ordering
     const positions = LayoutPositioner.calculatePositions(
       finalLayers,
-      this.entities,  // Pass entities to calculate heights
+      optimizedEntities,  // Use optimized entities to calculate heights
       {
         entityWidth: this.entityWidth,
         entityHeaderHeight: this.entityHeaderHeight,
