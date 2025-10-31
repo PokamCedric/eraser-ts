@@ -4,7 +4,7 @@
  * Creates and configures Monaco editor instances
  */
 
-import { Logger } from '../../infrastructure/layout/utils/Logger';
+import { Logger } from '../../infrastructure/utils/Logger';
 
 // Declare global Monaco types
 declare global {

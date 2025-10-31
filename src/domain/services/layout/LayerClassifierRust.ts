@@ -10,8 +10,8 @@
  * - Sinon, un fallback vers l'implémentation TypeScript est utilisé
  */
 
-import { LayerClassifier } from './orchestrator/LayerClassifier';
-import { Logger } from './utils/Logger';
+import { LayerClassifier } from './LayerClassifier';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 interface LayerClassifierNative {
   new(): LayerClassifierNative;

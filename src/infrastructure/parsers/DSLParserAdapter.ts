@@ -8,7 +8,7 @@ import { Field } from '../../domain/entities/Field';
 import { Relationship } from '../../domain/entities/Relationship';
 import { IDiagramRepository, ParseDSLResult, ParseError } from '../../domain/repositories/IDiagramRepository';
 import { addFieldToEntity } from '../../data/models/utils';
-import { Logger } from '../layout/utils/Logger';
+import { Logger } from '../utils/Logger';
 
 interface Metadata {
   [key: string]: string;

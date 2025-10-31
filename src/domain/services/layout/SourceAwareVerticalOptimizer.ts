@@ -19,7 +19,7 @@
  */
 
 import { DirectedRelation } from './types';
-import { Logger } from '../utils/Logger';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 export class SourceAwareVerticalOptimizer {
   private relations: DirectedRelation[];

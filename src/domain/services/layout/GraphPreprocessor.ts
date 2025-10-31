@@ -7,7 +7,7 @@
  */
 
 import { DirectedRelation } from './types';
-import { Logger } from '../utils/Logger';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 export interface PreprocessorResult {
   relations: DirectedRelation[];

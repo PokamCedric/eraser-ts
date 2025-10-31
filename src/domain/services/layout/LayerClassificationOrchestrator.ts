@@ -9,13 +9,13 @@
  * - Phase 5: Crossing minimization (CrossingMinimizer)
  */
 
-import { Relationship } from '../../../domain/entities/Relationship';
-import { DirectedRelation } from '../phases/types';
-import { GraphPreprocessor } from '../phases/GraphPreprocessor';
+import { Relationship } from '../../entities/Relationship';
+import { DirectedRelation } from './types';
+import { GraphPreprocessor } from './GraphPreprocessor';
 import { LayerClassifier } from './LayerClassifier';
-import { SourceAwareVerticalOptimizer } from '../phases/SourceAwareVerticalOptimizer';
-import { CrossingMinimizer } from '../phases/CrossingMinimizer';
-import { Logger } from '../utils/Logger';
+import { SourceAwareVerticalOptimizer } from './SourceAwareVerticalOptimizer';
+import { CrossingMinimizer } from './CrossingMinimizer';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 export class LayerClassificationOrchestrator {
   /**

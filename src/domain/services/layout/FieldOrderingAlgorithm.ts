@@ -14,10 +14,10 @@
  *   Then f1 should come before f2 to avoid crossings
  */
 
-import { Entity } from '../../domain/entities/Entity';
-import { Relationship } from '../../domain/entities/Relationship';
-import { reorderEntityFields } from '../../data/models/utils';
-import { Logger } from './utils/Logger';
+import { Entity } from '../../entities/Entity';
+import { Relationship } from '../../entities/Relationship';
+import { reorderEntityFields } from '../../../data/models/utils';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 export class FieldOrderingAlgorithm {
   /**

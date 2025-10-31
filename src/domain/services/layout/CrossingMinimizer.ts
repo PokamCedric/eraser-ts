@@ -15,15 +15,13 @@
  */
 
 import { DirectedRelation } from './types';
-import { Logger } from '../utils/Logger';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 export class CrossingMinimizer {
-  private relations: DirectedRelation[];
   private forwardEdges: Map<string, Set<string>>; // entity -> targets
   private backwardEdges: Map<string, Set<string>>; // entity -> sources
 
   constructor(relations: DirectedRelation[]) {
-    this.relations = relations;
 
     // Build adjacency maps for fast lookup
     this.forwardEdges = new Map();

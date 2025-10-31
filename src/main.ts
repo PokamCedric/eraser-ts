@@ -16,7 +16,7 @@ import { CanvasRendererAdapter } from './infrastructure/renderers/CanvasRenderer
 import { SQLExporter } from './infrastructure/exporters/SQLExporter';
 import { TypeScriptExporter } from './infrastructure/exporters/TypeScriptExporter';
 import { JSONExporter } from './infrastructure/exporters/JSONExporter';
-import { Logger } from './infrastructure/layout/utils/Logger';
+import { Logger } from './infrastructure/utils/Logger';
 
 // Presentation
 import { AppController } from './presentation/controllers/AppController';

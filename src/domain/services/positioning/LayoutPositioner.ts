@@ -5,8 +5,8 @@
  * Takes into account entity heights to avoid overlaps.
  */
 
-import { Position } from '../../domain/value-objects/Position';
-import { Entity } from '../../domain/entities/Entity';
+import { Position } from '../../value-objects/Position';
+import { Entity } from '../../entities/Entity';
 
 export interface LayoutConfig {
   entityWidth: number;

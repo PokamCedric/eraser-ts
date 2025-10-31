@@ -13,10 +13,10 @@
  * This class only handles field ordering within individual entities.
  */
 
-import { Entity } from '../../domain/entities/Entity';
-import { Relationship } from '../../domain/entities/Relationship';
+import { Entity } from '../../entities/Entity';
+import { Relationship } from '../../entities/Relationship';
 import { FieldOrderingAlgorithm } from './FieldOrderingAlgorithm';
-import { Logger } from './utils/Logger';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 export class MagneticAlignmentOptimizer {
   /**

@@ -13,8 +13,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { LayerClassificationEngine } from './LayerClassificationEngine';
-import { Entity } from '../../domain/entities/Entity';
-import { Relationship } from '../../domain/entities/Relationship';
+import { Entity } from '../../entities/Entity';
+import { Relationship } from '../../entities/Relationship';
 
 describe('LayerClassificationEngine', () => {
   describe('Test 1: Intercalation Detection (Transitive Distances)', () => {
@@ -655,7 +655,7 @@ describe('LayerClassificationEngine', () => {
         },
       ];
 
-      const result = LayerClassificationEngine.layout(entities, relationships);
+      LayerClassificationEngine.layout(entities, relationships);
 
       // C should be the reference (most connected)
       // Check the console output to verify

@@ -23,7 +23,7 @@
  * Performance: 83.3x plus rapide que Floyd-Warshall
  */
 
-import { Logger } from '../utils/Logger';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 interface DirectedRelation {
   left: string;

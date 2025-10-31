@@ -11,10 +11,10 @@
  * Documentation: docs/layer-classification-algorithm-technical-deep-dive.md
  */
 
-import { Entity } from '../../domain/entities/Entity';
-import { Relationship } from '../../domain/entities/Relationship';
-import { LayerClassificationOrchestrator } from './orchestrator/LayerClassificationOrchestrator';
-import { Logger } from './utils/Logger';
+import { Entity } from '../../entities/Entity';
+import { Relationship } from '../../entities/Relationship';
+import { LayerClassificationOrchestrator } from './LayerClassificationOrchestrator';
+import { Logger } from '../../../infrastructure/utils/Logger';
 
 export interface LayerClassificationResult {
   layers: Map<number, string[]>;

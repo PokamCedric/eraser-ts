@@ -7,11 +7,11 @@ import { IRenderer } from '../../domain/repositories/IRenderer';
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
-import { LayerClassificationEngine } from '../layout/LayerClassificationEngine';
-import { LayoutPositioner } from '../layout/LayoutPositioner';
-import { MagneticAlignmentOptimizer } from '../layout/MagneticAlignmentOptimizer';
+import { LayerClassificationEngine } from '../../domain/services/layout/LayerClassificationEngine';
+import { LayoutPositioner } from '../../domain/services/positioning/LayoutPositioner';
+import { MagneticAlignmentOptimizer } from '../../domain/services/layout/MagneticAlignmentOptimizer';
 import { getRelationshipCardinality } from '../../data/models/utils';
-import { Logger } from '../layout/utils/Logger';
+import { Logger } from '../utils/Logger';
 
 interface MousePosition {
   x: number;
