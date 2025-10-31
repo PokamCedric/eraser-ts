@@ -16,6 +16,7 @@ import { ViewportManager } from './ViewportManager';
 import { EntityRenderer } from './EntityRenderer';
 import { RelationshipRenderer } from './RelationshipRenderer';
 import { CanvasInteractionHandler } from './CanvasInteractionHandler';
+import { IconLoader } from './IconLoader';
 
 export class CanvasRendererAdapter implements IRenderer {
   private canvas: HTMLCanvasElement;
@@ -89,6 +90,18 @@ export class CanvasRendererAdapter implements IRenderer {
   setData(entities: Entity[], relationships: Relationship[]): void {
     this.entities = entities;
     this.relationships = relationships;
+
+    // Preload icons for all entities
+    const iconNames = entities
+      .map(e => e.icon)
+      .filter(icon => icon && icon !== 'box');
+
+    if (iconNames.length > 0) {
+      IconLoader.preload(iconNames).then(() => {
+        // Re-render after icons are loaded
+        this.render();
+      });
+    }
 
     // Apply auto-layout automatically if there are entities
     if (this.entities.length > 0) {

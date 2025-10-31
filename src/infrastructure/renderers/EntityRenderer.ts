@@ -6,6 +6,7 @@
  */
 
 import { Entity } from '../../domain/entities/Entity';
+import { IconLoader } from './IconLoader';
 
 export interface EntityRenderConfig {
   entityWidth: number;
@@ -21,6 +22,8 @@ export interface EntityRenderConfig {
 }
 
 export class EntityRenderer {
+  private iconsLoaded: Set<string> = new Set();
+
   constructor(private config: EntityRenderConfig) {}
 
   /**
@@ -54,21 +57,45 @@ export class EntityRenderer {
     ctx.fillStyle = entity.color || '#3b82f6';
     ctx.fillRect(x, y, width, headerHeight);
 
-    // Icon (emoji or text icon)
-    if (entity.icon) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '20px -apple-system, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(entity.icon, x + 12, y + headerHeight / 2);
+    // Icon (SVG from Lucide Icons or emoji fallback)
+    let iconRendered = false;
+    if (entity.icon && entity.icon !== 'box') {
+      // Try to load SVG icon
+      if (!this.iconsLoaded.has(entity.icon)) {
+        IconLoader.load(entity.icon).then(() => {
+          this.iconsLoaded.add(entity.icon);
+        });
+      }
+
+      const iconImg = IconLoader.getCached(entity.icon);
+      if (iconImg) {
+        // Draw SVG icon (white colored via filter)
+        ctx.save();
+        // Apply white color filter to SVG
+        ctx.filter = 'brightness(0) invert(1)';
+        const iconSize = 20;
+        const iconX = x + 12;
+        const iconY = y + (headerHeight - iconSize) / 2;
+        ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
+        ctx.restore();
+        iconRendered = true;
+      } else {
+        // Fallback: render as emoji/text if available
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '20px -apple-system, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(entity.icon, x + 12, y + headerHeight / 2);
+        iconRendered = true;
+      }
     }
 
     // Entity name (offset if icon present)
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 16px -apple-system, sans-serif';
-    ctx.textAlign = entity.icon ? 'left' : 'center';
+    ctx.textAlign = iconRendered ? 'left' : 'center';
     ctx.textBaseline = 'middle';
-    const nameX = entity.icon ? x + 42 : x + width / 2;
+    const nameX = iconRendered ? x + 42 : x + width / 2;
     ctx.fillText(entity.displayName, nameX, y + headerHeight / 2);
 
     // Fields
