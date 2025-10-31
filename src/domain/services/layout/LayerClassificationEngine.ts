@@ -14,6 +14,9 @@
 import { Entity } from '../../entities/Entity';
 import { Relationship } from '../../entities/Relationship';
 import { LayerClassificationOrchestrator } from './LayerClassificationOrchestrator';
+import { LayerClassifier } from './LayerClassifier';
+import { SourceAwareVerticalOptimizer } from './SourceAwareVerticalOptimizer';
+import { CrossingMinimizer } from './CrossingMinimizer';
 import { Logger } from '../../../infrastructure/utils/Logger';
 
 export interface LayerClassificationResult {
@@ -30,10 +33,30 @@ export class LayerClassificationEngine {
    * @returns Layer classification result with layer assignments
    */
   static layout(entities: Entity[], relationships: Relationship[]): LayerClassificationResult {
-    Logger.section('LAYER CLASSIFICATION ENGINE (MODULAR ARCHITECTURE)');
+    const logger = Logger.getInstance();
+    logger.section('LAYER CLASSIFICATION ENGINE (MODULAR ARCHITECTURE)');
+
+    // Create algorithm instances with logger
+    const layerClassifier = new LayerClassifier(logger);
+    const verticalOptimizer = new SourceAwareVerticalOptimizer(relationships.map(rel => ({
+      left: rel.from.entity,
+      right: rel.to.entity
+    })), logger);
+    const crossingMinimizer = new CrossingMinimizer(relationships.map(rel => ({
+      left: rel.from.entity,
+      right: rel.to.entity
+    })), logger);
+
+    // Create orchestrator with dependencies
+    const orchestrator = new LayerClassificationOrchestrator(
+      logger,
+      layerClassifier,
+      verticalOptimizer,
+      crossingMinimizer
+    );
 
     // Run orchestrator to get final layers
-    const layers = LayerClassificationOrchestrator.classify(relationships);
+    const layers = orchestrator.classify(relationships);
 
     // Build result maps
     const layersMap = new Map<number, string[]>();
@@ -56,13 +79,13 @@ export class LayerClassificationEngine {
         }
         layersMap.get(maxLayer + 1)!.push(entity.name);
 
-        Logger.info(`\n[INFO] Isolated entity '${entity.name}' placed at layer ${maxLayer + 1}`);
+        logger.info(`\n[INFO] Isolated entity '${entity.name}' placed at layer ${maxLayer + 1}`);
       }
     });
 
-    Logger.section('LAYOUT COMPLETE');
-    Logger.debug(`Total layers: ${layersMap.size}`);
-    Logger.debug(`Total entities: ${entities.length}`);
+    logger.section('LAYOUT COMPLETE');
+    logger.debug(`Total layers: ${layersMap.size}`);
+    logger.debug(`Total entities: ${entities.length}`);
 
     return { layers: layersMap, layerOf };
   }

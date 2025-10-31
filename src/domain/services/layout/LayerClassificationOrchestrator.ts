@@ -12,29 +12,42 @@
 import { Relationship } from '../../entities/Relationship';
 import { DirectedRelation } from './types';
 import { GraphPreprocessor } from './GraphPreprocessor';
-import { LayerClassifier } from './LayerClassifier';
-import { SourceAwareVerticalOptimizer } from './SourceAwareVerticalOptimizer';
-import { CrossingMinimizer } from './CrossingMinimizer';
-import { Logger } from '../../../infrastructure/utils/Logger';
+import { ILayerClassifier } from './ILayerClassifier';
+import { IVerticalOptimizer } from './IVerticalOptimizer';
+import { ICrossingMinimizer } from './ICrossingMinimizer';
+import { ILogger } from '../ILogger';
 
+/**
+ * Layer Classification Orchestrator
+ *
+ * Coordinates the layer classification pipeline using dependency injection.
+ * Respects Dependency Inversion Principle (DIP) by depending on abstractions.
+ */
 export class LayerClassificationOrchestrator {
+  constructor(
+    private readonly logger: ILogger,
+    private readonly layerClassifier: ILayerClassifier,
+    private readonly verticalOptimizer: IVerticalOptimizer,
+    private readonly crossingMinimizer: ICrossingMinimizer
+  ) {}
+
   /**
    * Parse relationships into directed relations
    */
-  private static parseRelations(relationships: Relationship[]): DirectedRelation[] {
+  private parseRelations(relationships: Relationship[]): DirectedRelation[] {
     const relations: DirectedRelation[] = [];
 
-    Logger.subsection('PHASE 0: PARSING RELATIONS');
+    this.logger.subsection('PHASE 0: PARSING RELATIONS');
 
     for (const rel of relationships) {
       const left = rel.from.entity;
       const right = rel.to.entity;
 
       relations.push({ left, right });
-      Logger.debug(`  ${left} > ${right}`);
+      this.logger.debug(`  ${left} > ${right}`);
     }
 
-    Logger.debug(`Parsed ${relations.length} relations`);
+    this.logger.debug(`Parsed ${relations.length} relations`);
 
     return relations;
   }
@@ -45,46 +58,42 @@ export class LayerClassificationOrchestrator {
    * @param relationships - Array of domain Relationship objects
    * @returns Array of layers, where each layer is an array of entity names
    */
-  static classify(relationships: Relationship[]): string[][] {
-    Logger.section('LAYER CLASSIFICATION ORCHESTRATOR');
+  classify(relationships: Relationship[]): string[][] {
+    this.logger.section('LAYER CLASSIFICATION ORCHESTRATOR');
 
     // PHASE 0: Parse relationships
     const relationsRaw = this.parseRelations(relationships);
 
     // PHASE 1-2: Preprocessing
-    const { relations, connectionCount } = GraphPreprocessor.buildBacklog(relationsRaw);
-    const entityOrder = GraphPreprocessor.buildEntityOrder(relations, connectionCount);
+    const { relations, connectionCount } = GraphPreprocessor.buildBacklog(relationsRaw, this.logger);
+    const entityOrder = GraphPreprocessor.buildEntityOrder(relations, connectionCount, this.logger);
 
     // PHASE 3: Horizontal alignment (X-axis)
-    Logger.subsection('PHASE 3: HORIZONTAL ALIGNMENT (X-AXIS)');
-    Logger.debug(`Using LayerClassifier (algo10)`);
+    this.logger.subsection('PHASE 3: HORIZONTAL ALIGNMENT (X-AXIS)');
+    this.logger.debug(`Using LayerClassifier (algo10)`);
 
-    const classifier = new LayerClassifier();
-
-    Logger.debug(`\nAdding ${relations.length} relations to classifier...`);
+    this.logger.debug(`\nAdding ${relations.length} relations to classifier...`);
     for (const { left, right } of relations) {
-      classifier.addRelation(left, right);
+      this.layerClassifier.addRelation(left, right);
     }
 
-    const horizontalLayers = classifier.computeLayers(entityOrder);
+    const horizontalLayers = this.layerClassifier.computeLayers(entityOrder);
 
-    Logger.debug(`\nHorizontal layers: ${horizontalLayers.length} layers`);
+    this.logger.debug(`\nHorizontal layers: ${horizontalLayers.length} layers`);
     horizontalLayers.forEach((layer, idx) => {
-      Logger.debug(`  Layer ${idx}: [${layer.join(', ')}]`);
+      this.logger.debug(`  Layer ${idx}: [${layer.join(', ')}]`);
     });
 
     // PHASE 4: Source-aware vertical alignment (Y-axis)
-    const verticalOptimizer = new SourceAwareVerticalOptimizer(relations);
-    const verticalLayers = verticalOptimizer.optimize(horizontalLayers, entityOrder);
+    const verticalLayers = this.verticalOptimizer.optimize(horizontalLayers, entityOrder);
 
     // PHASE 5: Crossing minimization
-    const crossingMinimizer = new CrossingMinimizer(relations);
-    const finalLayers = crossingMinimizer.minimizeCrossings(verticalLayers, 4);
+    const finalLayers = this.crossingMinimizer.minimizeCrossings(verticalLayers, 4);
 
     // Final result
-    Logger.section('FINAL LAYERS');
+    this.logger.section('FINAL LAYERS');
     finalLayers.forEach((layer, idx) => {
-      Logger.debug(`Layer ${idx}: [${layer.join(', ')}]`);
+      this.logger.debug(`Layer ${idx}: [${layer.join(', ')}]`);
     });
 
     return finalLayers;

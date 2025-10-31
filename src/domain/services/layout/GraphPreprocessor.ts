@@ -7,7 +7,7 @@
  */
 
 import { DirectedRelation } from './types';
-import { Logger } from '../../../infrastructure/utils/Logger';
+import { ILogger } from '../ILogger';
 
 export interface PreprocessorResult {
   relations: DirectedRelation[];
@@ -23,10 +23,11 @@ export class GraphPreprocessor {
    * - (A, B) and (B, A) -> keep one (bidirectional treated as same)
    *
    * @param relationsRaw - Raw relations from parser
+   * @param logger - Logger instance for debugging
    * @returns Deduplicated relations and connection counts
    */
-  static buildBacklog(relationsRaw: DirectedRelation[]): PreprocessorResult {
-    Logger.subsection('PHASE 1: DEDUPLICATION (BUILD BACKLOG)');
+  static buildBacklog(relationsRaw: DirectedRelation[], logger: ILogger): PreprocessorResult {
+    logger.subsection('PHASE 1: DEDUPLICATION (BUILD BACKLOG)');
 
     // Deduplication based on entity PAIR (order-agnostic)
     const seenPairs = new Map<string, DirectedRelation>();
@@ -48,16 +49,16 @@ export class GraphPreprocessor {
       }
     }
 
-    Logger.debug(`After deduplication: ${uniqueRelations.length} unique relations`);
+    logger.debug(`After deduplication: ${uniqueRelations.length} unique relations`);
 
     if (duplicatesRemoved.length > 0) {
-      Logger.debug(`\n${duplicatesRemoved.length} duplicate(s) removed:`);
-      duplicatesRemoved.slice(0, 5).forEach(dup => Logger.debug(dup));
+      logger.debug(`\n${duplicatesRemoved.length} duplicate(s) removed:`);
+      duplicatesRemoved.slice(0, 5).forEach(dup => logger.debug(dup));
       if (duplicatesRemoved.length > 5) {
-        Logger.debug(`  ... (${duplicatesRemoved.length - 5} more)`);
+        logger.debug(`  ... (${duplicatesRemoved.length - 5} more)`);
       }
     } else {
-      Logger.debug('No duplicates detected');
+      logger.debug('No duplicates detected');
     }
 
     // Count connections
@@ -84,9 +85,10 @@ export class GraphPreprocessor {
    */
   static buildEntityOrder(
     relations: DirectedRelation[],
-    connectionCount: Map<string, number>
+    connectionCount: Map<string, number>,
+    logger: ILogger
   ): string[] {
-    Logger.subsection('PHASE 2: ENTITY ORDERING');
+    logger.subsection('PHASE 2: ENTITY ORDERING');
 
     // Liste-Règle 1 (reference)
     const listeRegle1 = Array.from(connectionCount.keys()).sort(
@@ -141,9 +143,9 @@ export class GraphPreprocessor {
       }
     }
 
-    Logger.debug(`Entity order (top 10): ${entityOrder.slice(0, 10).join(' > ')}`);
+    logger.debug(`Entity order (top 10): ${entityOrder.slice(0, 10).join(' > ')}`);
     if (entityOrder.length > 10) {
-      Logger.debug(`  ... (${entityOrder.length - 10} more)`);
+      logger.debug(`  ... (${entityOrder.length - 10} more)`);
     }
 
     return entityOrder;

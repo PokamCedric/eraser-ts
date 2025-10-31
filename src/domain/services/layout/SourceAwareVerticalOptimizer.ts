@@ -19,13 +19,14 @@
  */
 
 import { DirectedRelation } from './types';
-import { Logger } from '../../../infrastructure/utils/Logger';
+import { ILogger } from '../ILogger';
+import { IVerticalOptimizer } from './IVerticalOptimizer';
 
-export class SourceAwareVerticalOptimizer {
+export class SourceAwareVerticalOptimizer implements IVerticalOptimizer {
   private relations: DirectedRelation[];
   private reverseRelations: Map<string, Set<string>>; // target -> sources
 
-  constructor(relations: DirectedRelation[]) {
+  constructor(relations: DirectedRelation[], private readonly logger: ILogger) {
     this.relations = relations;
 
     // Build reverse relation map for fast lookup
@@ -45,7 +46,7 @@ export class SourceAwareVerticalOptimizer {
     horizontalLayers: string[][],
     entityOrder: string[]
   ): string[][] {
-    Logger.section('PHASE 4: SOURCE-AWARE VERTICAL ALIGNMENT (Y-AXIS)');
+    this.logger.section('PHASE 4: SOURCE-AWARE VERTICAL ALIGNMENT (Y-AXIS)');
 
     if (horizontalLayers.length === 0) {
       return horizontalLayers;
@@ -58,8 +59,8 @@ export class SourceAwareVerticalOptimizer {
     const lastIdx = layers.length - 1;
     layers[lastIdx] = this.orderByEntityOrder(layers[lastIdx], entityOrder);
 
-    Logger.debug(`\nLast layer ${lastIdx}: ordered by connectivity`);
-    Logger.debug(`  ${JSON.stringify(layers[lastIdx])}`);
+    this.logger.debug(`\nLast layer ${lastIdx}: ordered by connectivity`);
+    this.logger.debug(`  ${JSON.stringify(layers[lastIdx])}`);
 
     // Process other layers from right to left
     for (let layerIdx = layers.length - 2; layerIdx >= 0; layerIdx--) {
@@ -67,7 +68,7 @@ export class SourceAwareVerticalOptimizer {
       const prevLayer = layerIdx > 0 ? layers[layerIdx - 1] : [];
       const nextLayer = layers[layerIdx + 1];
 
-      Logger.subsection(`Processing Layer ${layerIdx}`);
+      this.logger.subsection(`Processing Layer ${layerIdx}`);
 
       const orderedLayer = this.orderBySourceChains(
         currentLayer,
@@ -79,7 +80,7 @@ export class SourceAwareVerticalOptimizer {
       layers[layerIdx] = orderedLayer;
     }
 
-    Logger.section('SOURCE-AWARE VERTICAL OPTIMIZATION COMPLETE');
+    this.logger.section('SOURCE-AWARE VERTICAL OPTIMIZATION COMPLETE');
 
     return layers;
   }
@@ -136,7 +137,7 @@ export class SourceAwareVerticalOptimizer {
       entityTargets.set(entity, targets);
     }
 
-    Logger.debug(`\nSource chains (Layer ${prevLayer.length > 0 ? JSON.stringify(prevLayer) : '[]'} -> current -> ${JSON.stringify(nextLayer)}):`);
+    this.logger.debug(`\nSource chains (Layer ${prevLayer.length > 0 ? JSON.stringify(prevLayer) : '[]'} -> current -> ${JSON.stringify(nextLayer)}):`);
 
     // Detect pivots (entities with multiple targets)
     const pivots = new Map<string, Set<string>>();
@@ -148,9 +149,9 @@ export class SourceAwareVerticalOptimizer {
     }
 
     if (pivots.size > 0) {
-      Logger.debug(`\nPivots detected: ${pivots.size}`);
+      this.logger.debug(`\nPivots detected: ${pivots.size}`);
       for (const [pivot, targets] of pivots.entries()) {
-        Logger.debug(`  [${pivot}] connects ${targets.size} targets: ${JSON.stringify([...targets].sort())}`);
+        this.logger.debug(`  [${pivot}] connects ${targets.size} targets: ${JSON.stringify([...targets].sort())}`);
       }
     }
 
@@ -229,7 +230,7 @@ export class SourceAwareVerticalOptimizer {
           const sources = [...entitySources.get(entity)!].sort();
           const targets = [...entityTargets.get(entity)!].sort();
           const pivotMarker = pivots.has(entity) ? '*' : '';
-          Logger.debug(`  [${entity}${pivotMarker}] from ${JSON.stringify(sources)} -> to ${JSON.stringify(targets)}`);
+          this.logger.debug(`  [${entity}${pivotMarker}] from ${JSON.stringify(sources)} -> to ${JSON.stringify(targets)}`);
         }
 
         ordered.push(...sortedGroup);
@@ -246,11 +247,11 @@ export class SourceAwareVerticalOptimizer {
         if (idxB === -1) return -1;
         return idxA - idxB;
       });
-      Logger.debug(`\n  Entities with no sources: ${JSON.stringify(noSourceEntities)}`);
+      this.logger.debug(`\n  Entities with no sources: ${JSON.stringify(noSourceEntities)}`);
       ordered.push(...noSourceEntities);
     }
 
-    Logger.debug(`\nFinal order: ${JSON.stringify(ordered)}`);
+    this.logger.debug(`\nFinal order: ${JSON.stringify(ordered)}`);
 
     return ordered;
   }

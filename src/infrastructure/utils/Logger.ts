@@ -11,6 +11,17 @@ import { ILogger } from '../../domain/services/ILogger';
 
 export class Logger implements ILogger {
   private static debugEnabled: boolean = false;
+  private static instance: Logger;
+
+  /**
+   * Get singleton instance
+   */
+  static getInstance(): Logger {
+    if (!Logger.instance) {
+      Logger.instance = new Logger();
+    }
+    return Logger.instance;
+  }
 
   /**
    * Enable or disable debug logging globally
@@ -29,37 +40,37 @@ export class Logger implements ILogger {
   /**
    * Log a debug message (only if debug is enabled)
    */
-  static debug(...args: any[]): void {
+  debug(message: string, ...args: any[]): void {
     if (Logger.debugEnabled) {
-      console.log(...args);
+      console.log(message, ...args);
     }
   }
 
   /**
    * Log an info message (always shown)
    */
-  static info(...args: any[]): void {
-    console.log(...args);
+  info(message: string, ...args: any[]): void {
+    console.log(message, ...args);
   }
 
   /**
    * Log a warning message (always shown)
    */
-  static warn(...args: any[]): void {
-    console.warn(...args);
+  warn(message: string, ...args: any[]): void {
+    console.warn(message, ...args);
   }
 
   /**
    * Log an error message (always shown)
    */
-  static error(...args: any[]): void {
-    console.error(...args);
+  error(message: string, ...args: any[]): void {
+    console.error(message, ...args);
   }
 
   /**
    * Log a separator line (only if debug is enabled)
    */
-  static separator(char: string = '=', length: number = 80): void {
+  separator(char: string = '=', length: number = 80): void {
     if (Logger.debugEnabled) {
       console.log(char.repeat(length));
     }
@@ -68,7 +79,7 @@ export class Logger implements ILogger {
   /**
    * Log a section header (only if debug is enabled)
    */
-  static section(title: string): void {
+  section(title: string): void {
     if (Logger.debugEnabled) {
       console.log('\n' + '='.repeat(80));
       console.log(title);
@@ -79,9 +90,34 @@ export class Logger implements ILogger {
   /**
    * Log a subsection header (only if debug is enabled)
    */
-  static subsection(title: string): void {
+  subsection(title: string): void {
     if (Logger.debugEnabled) {
       console.log(`\n--- ${title} ---`);
     }
+  }
+
+  // Legacy static methods for backward compatibility
+  static debug(...args: any[]): void {
+    Logger.getInstance().debug(args.join(' '));
+  }
+
+  static info(...args: any[]): void {
+    Logger.getInstance().info(args.join(' '));
+  }
+
+  static warn(...args: any[]): void {
+    Logger.getInstance().warn(args.join(' '));
+  }
+
+  static error(...args: any[]): void {
+    Logger.getInstance().error(args.join(' '));
+  }
+
+  static section(title: string): void {
+    Logger.getInstance().section(title);
+  }
+
+  static subsection(title: string): void {
+    Logger.getInstance().subsection(title);
   }
 }

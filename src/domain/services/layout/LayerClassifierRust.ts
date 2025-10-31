@@ -11,6 +11,8 @@
  */
 
 import { LayerClassifier } from './LayerClassifier';
+import { ILayerClassifier } from './ILayerClassifier';
+import { ILogger } from '../ILogger';
 import { Logger } from '../../../infrastructure/utils/Logger';
 
 interface LayerClassifierNative {
@@ -40,17 +42,17 @@ try {
  * Si le module Rust n'est pas disponible, utilise automatiquement
  * l'implémentation TypeScript.
  */
-export class LayerClassifierRust {
+export class LayerClassifierRust implements ILayerClassifier {
   private classifier: any;
   private usingRust: boolean;
 
-  constructor() {
+  constructor(logger: ILogger) {
     if (nativeModule) {
       this.classifier = new nativeModule.LayerClassifier();
       this.usingRust = true;
     } else {
       // Fallback vers l'implémentation TypeScript
-      this.classifier = new LayerClassifier();
+      this.classifier = new LayerClassifier(logger);
       this.usingRust = false;
     }
   }
@@ -65,10 +67,11 @@ export class LayerClassifierRust {
   /**
    * Calcule les layers en utilisant l'algorithme Floyd-Warshall inversé
    *
+   * @param entityOrder - Optional preferred order for entities
    * @returns Array de layers (chaque layer = array d'entités triées)
    */
-  computeLayers(): string[][] {
-    return this.classifier.computeLayers();
+  computeLayers(entityOrder?: string[]): string[][] {
+    return this.classifier.computeLayers(entityOrder);
   }
 
   /**

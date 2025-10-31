@@ -4,8 +4,6 @@
  * Abstraction for vertical ordering optimization algorithms.
  */
 
-import { DirectedRelation } from './types';
-
 export interface IVerticalOptimizer {
   /**
    * Optimize vertical order within each layer

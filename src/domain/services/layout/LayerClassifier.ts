@@ -23,7 +23,8 @@
  * Performance: 83.3x plus rapide que Floyd-Warshall
  */
 
-import { Logger } from '../../../infrastructure/utils/Logger';
+import { ILogger } from '../ILogger';
+import { ILayerClassifier } from './ILayerClassifier';
 
 interface DirectedRelation {
   left: string;
@@ -40,8 +41,11 @@ interface DirectedRelation {
  * - Placement des entités par rapport à une entité de référence
  *
  * Les phases 1 (pré-processing) et 4 (réorganisation) sont gérées en externe.
+ *
+ * Implements ILayerClassifier to respect Dependency Inversion Principle.
  */
-export class LayerClassifier {
+export class LayerClassifier implements ILayerClassifier {
+  constructor(private readonly logger: ILogger) {}
   private relations: DirectedRelation[] = [];
   private entities: Set<string> = new Set();
   private distances: Map<string, number> = new Map();
@@ -281,7 +285,7 @@ export class LayerClassifier {
       }
     }
 
-    Logger.debug(
+    this.logger.debug(
       `\n[DEBUG] Entite de reference: ${referenceEntity} (${bestScore[0]} connexions, somme voisins: ${bestScore[1]})`
     );
 
@@ -341,7 +345,7 @@ export class LayerClassifier {
     }
 
     // Afficher résumé des distances
-    Logger.debug(`\n[DEBUG] DISTANCES PAR RAPPORT A ${referenceEntity.toUpperCase()}`);
+    this.logger.debug(`\n[DEBUG] DISTANCES PAR RAPPORT A ${referenceEntity.toUpperCase()}`);
     const byDistance = new Map<number, string[]>();
     for (const [entity, layer] of layers.entries()) {
       if (entity !== referenceEntity) {
@@ -356,9 +360,9 @@ export class LayerClassifier {
     const sortedDistances2 = Array.from(byDistance.keys()).sort((a, b) => a - b);
     for (const dist of sortedDistances2) {
       const direction = dist < 0 ? 'GAUCHE' : dist > 0 ? 'DROITE' : 'MEME LAYER';
-      Logger.debug(`[DEBUG] Distance ${dist >= 0 ? '+' : ''}${dist} (${direction}):`);
+      this.logger.debug(`[DEBUG] Distance ${dist >= 0 ? '+' : ''}${dist} (${direction}):`);
       for (const entity of byDistance.get(dist)!.sort()) {
-        Logger.debug(`[DEBUG]   - ${entity}`);
+        this.logger.debug(`[DEBUG]   - ${entity}`);
       }
     }
 
@@ -368,8 +372,8 @@ export class LayerClassifier {
       for (const [entity, layer] of layers.entries()) {
         layers.set(entity, layer - minLayer);
       }
-      Logger.debug(`\n[DEBUG] Normalisation: decalage de ${-minLayer}`);
-      Logger.debug(`[DEBUG] ${referenceEntity} est maintenant au layer ${layers.get(referenceEntity)}`);
+      this.logger.debug(`\n[DEBUG] Normalisation: decalage de ${-minLayer}`);
+      this.logger.debug(`[DEBUG] ${referenceEntity} est maintenant au layer ${layers.get(referenceEntity)}`);
     }
 
     // Grouper par layer
