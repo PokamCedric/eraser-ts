@@ -5,8 +5,15 @@
  */
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
+import { SQLTypeMapper } from './TypeMapper';
 
 export class SQLExporter {
+  private typeMapper: SQLTypeMapper;
+
+  constructor() {
+    this.typeMapper = new SQLTypeMapper();
+  }
+
   export(entities: Entity[], relationships: Relationship[]): string {
     let sql = '-- Generated SQL DDL\n\n';
 
@@ -16,16 +23,7 @@ export class SQLExporter {
       const fields = entity.fields.map(field => {
         let line = `  ${field.name} `;
 
-        const typeMap: Record<string, string> = {
-          'string': 'VARCHAR(255)',
-          'int': 'INTEGER',
-          'bool': 'BOOLEAN',
-          'timestamp': 'TIMESTAMP',
-          'datetime': 'DATETIME',
-          'num': 'NUMERIC',
-          'double': 'DOUBLE PRECISION'
-        };
-        line += typeMap[field.type] || 'TEXT';
+        line += this.typeMapper.map(field.type, 'TEXT');
 
         if (field.isPrimaryKey) line += ' PRIMARY KEY';
         if (field.isRequired && !field.isPrimaryKey) line += ' NOT NULL';

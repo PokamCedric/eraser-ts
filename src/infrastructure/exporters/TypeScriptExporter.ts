@@ -5,8 +5,15 @@
  */
 import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
+import { TypeScriptTypeMapper } from './TypeMapper';
 
 export class TypeScriptExporter {
+  private typeMapper: TypeScriptTypeMapper;
+
+  constructor() {
+    this.typeMapper = new TypeScriptTypeMapper();
+  }
+
   export(entities: Entity[], _relationships: Relationship[]): string {
     let ts = '// Generated TypeScript Interfaces\n\n';
 
@@ -15,16 +22,7 @@ export class TypeScriptExporter {
 
       for (const field of entity.fields) {
         const optional = !field.isRequired ? '?' : '';
-        const typeMap: Record<string, string> = {
-          'string': 'string',
-          'int': 'number',
-          'num': 'number',
-          'double': 'number',
-          'bool': 'boolean',
-          'timestamp': 'Date',
-          'datetime': 'Date'
-        };
-        const type = typeMap[field.type] || 'any';
+        const type = this.typeMapper.map(field.type, 'any');
 
         if (field.enumValues && field.enumValues.length > 0) {
           ts += `  ${field.name}${optional}: ${field.enumValues.map(v => `'${v}'`).join(' | ')};\n`;
