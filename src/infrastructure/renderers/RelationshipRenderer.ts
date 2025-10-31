@@ -83,23 +83,64 @@ export class RelationshipRenderer {
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
 
-    // Draw line with orthogonal routing for horizontal connections
+    // Draw orthogonal line with rounded corners
     ctx.beginPath();
     ctx.moveTo(fromX, fromY);
 
-    // For horizontal layout, use orthogonal routing with midpoint
+    const cornerRadius = 12; // Rayon des coins arrondis
+
+    // For horizontal layout, use orthogonal routing with rounded corners
     if (dx !== 0) {
-      // Horizontal connection - use orthogonal routing
+      // Horizontal connection - orthogonal with rounded corners
       const midX = (fromX + toX) / 2;
-      ctx.lineTo(midX, fromY);
-      ctx.lineTo(midX, toY);
-      ctx.lineTo(toX, toY);
+      const dy = toY - fromY;
+
+      // First horizontal segment
+      if (Math.abs(dy) > cornerRadius * 2) {
+        // Has vertical difference - need corners
+        ctx.lineTo(midX - cornerRadius, fromY);
+
+        // First corner (turn down or up)
+        const turnDirection = dy > 0 ? 1 : -1;
+        ctx.arcTo(midX, fromY, midX, fromY + cornerRadius * turnDirection, cornerRadius);
+
+        // Vertical segment
+        ctx.lineTo(midX, toY - cornerRadius * turnDirection);
+
+        // Second corner (turn to target)
+        ctx.arcTo(midX, toY, midX + cornerRadius, toY, cornerRadius);
+
+        // Final horizontal segment
+        ctx.lineTo(toX, toY);
+      } else {
+        // Almost horizontal - direct line with slight curve
+        ctx.lineTo(toX, toY);
+      }
     } else {
-      // Vertical connection - direct line with midpoint
+      // Vertical connection - orthogonal with rounded corners
       const midY = (fromY + toY) / 2;
-      ctx.lineTo(fromX, midY);
-      ctx.lineTo(toX, midY);
-      ctx.lineTo(toX, toY);
+      const distX = toX - fromX;
+
+      if (Math.abs(distX) > cornerRadius * 2) {
+        // Has horizontal difference - need corners
+        ctx.lineTo(fromX, midY - cornerRadius);
+
+        // First corner
+        const turnDirection = distX > 0 ? 1 : -1;
+        ctx.arcTo(fromX, midY, fromX + cornerRadius * turnDirection, midY, cornerRadius);
+
+        // Horizontal segment
+        ctx.lineTo(toX - cornerRadius * turnDirection, midY);
+
+        // Second corner
+        ctx.arcTo(toX, midY, toX, midY + cornerRadius, cornerRadius);
+
+        // Final vertical segment
+        ctx.lineTo(toX, toY);
+      } else {
+        // Almost vertical - direct line
+        ctx.lineTo(toX, toY);
+      }
     }
 
     ctx.stroke();

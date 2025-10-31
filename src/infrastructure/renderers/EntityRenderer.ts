@@ -54,12 +54,22 @@ export class EntityRenderer {
     ctx.fillStyle = entity.color || '#3b82f6';
     ctx.fillRect(x, y, width, headerHeight);
 
-    // Entity name
+    // Icon (emoji or text icon)
+    if (entity.icon) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '20px -apple-system, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(entity.icon, x + 12, y + headerHeight / 2);
+    }
+
+    // Entity name (offset if icon present)
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 16px -apple-system, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.textAlign = entity.icon ? 'left' : 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(entity.displayName, x + width / 2, y + headerHeight / 2);
+    const nameX = entity.icon ? x + 42 : x + width / 2;
+    ctx.fillText(entity.displayName, nameX, y + headerHeight / 2);
 
     // Fields
     entity.fields.forEach((field, index) => {
