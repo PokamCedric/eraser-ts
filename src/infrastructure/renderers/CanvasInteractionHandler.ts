@@ -16,12 +16,21 @@ interface MousePosition {
 
 export class CanvasInteractionHandler {
   private isPanning: boolean = false;
+  private isDragging: boolean = false;
+  private draggedEntity: Entity | null = null;
+  private dragOffset: MousePosition = { x: 0, y: 0 };
   private lastMousePos: MousePosition = { x: 0, y: 0 };
 
   constructor(
     private canvas: HTMLCanvasElement,
     private viewportManager: ViewportManager,
-    private onRender: () => void
+    private onRender: () => void,
+    private getEntities: () => Entity[],
+    private getEntityPositions: () => Map<string, Position>,
+    private updateEntityPosition: (entityName: string, position: Position) => void,
+    private entityWidth: number,
+    private entityHeaderHeight: number,
+    private entityFieldHeight: number
   ) {
     this.setupEventListeners();
   }
@@ -44,6 +53,33 @@ export class CanvasInteractionHandler {
       // Middle mouse or Shift+Left mouse = pan
       this.isPanning = true;
       this.canvas.style.cursor = 'grabbing';
+    } else if (e.button === 0) {
+      // Left mouse = try to drag entity
+      const entity = this.findEntityAt(
+        mouseX,
+        mouseY,
+        this.getEntities(),
+        this.getEntityPositions(),
+        this.entityWidth,
+        this.entityHeaderHeight,
+        this.entityFieldHeight
+      );
+
+      if (entity) {
+        this.isDragging = true;
+        this.draggedEntity = entity;
+        this.canvas.style.cursor = 'move';
+
+        // Calculate offset from entity position
+        const worldPos = this.viewportManager.screenToWorld(mouseX, mouseY);
+        const entityPos = this.getEntityPositions().get(entity.name);
+        if (entityPos) {
+          this.dragOffset = {
+            x: worldPos.x - entityPos.x,
+            y: worldPos.y - entityPos.y
+          };
+        }
+      }
     }
   }
 
@@ -60,14 +96,30 @@ export class CanvasInteractionHandler {
       this.viewportManager.setPan(currentPan.x + dx, currentPan.y + dy);
 
       this.onRender();
+    } else if (this.isDragging && this.draggedEntity) {
+      // Update entity position
+      const worldPos = this.viewportManager.screenToWorld(mouseX, mouseY);
+      const newPosition = new Position({
+        x: worldPos.x - this.dragOffset.x,
+        y: worldPos.y - this.dragOffset.y
+      });
+
+      this.updateEntityPosition(this.draggedEntity.name, newPosition);
+      this.onRender();
     }
 
     this.lastMousePos = { x: mouseX, y: mouseY };
   }
 
-  private handleMouseUp(_e: MouseEvent): void {
-    if (this.isPanning) {
+  private handleMouseUp(e: MouseEvent): void {
+    if (this.isPanning && (e.button === 1 || e.button === 0)) {
       this.isPanning = false;
+      this.canvas.style.cursor = 'default';
+    }
+
+    if (this.isDragging && e.button === 0) {
+      this.isDragging = false;
+      this.draggedEntity = null;
       this.canvas.style.cursor = 'default';
     }
   }

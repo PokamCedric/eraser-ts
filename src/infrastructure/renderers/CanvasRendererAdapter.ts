@@ -86,7 +86,15 @@ export class CanvasRendererAdapter implements IRenderer {
     this.interactionHandler = new CanvasInteractionHandler(
       this.canvas,
       this.viewportManager,
-      () => this.render()
+      () => this.render(),
+      () => this.entities,
+      () => this.entityPositions,
+      (entityName: string, position: Position) => {
+        this.entityPositions.set(entityName, position);
+      },
+      this.entityWidth,
+      this.entityHeaderHeight,
+      this.entityFieldHeight
     );
   }
 
@@ -198,8 +206,8 @@ export class CanvasRendererAdapter implements IRenderer {
         entityWidth: this.entityWidth,
         entityHeaderHeight: this.entityHeaderHeight,
         entityFieldHeight: this.entityFieldHeight,
-        horizontalSpacing: this.entityWidth + 120,
-        verticalSpacing: 10,  // Minimum gap between entities
+        horizontalSpacing: this.entityWidth + 180,  // More horizontal space
+        verticalSpacing: 40,  // More vertical gap between entities (was 10)
         baseX: 100,
         displayHeight: this.displayHeight
       }

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:rust && tsc && vite build",
+    "build": "tsc && vite build",
+    "build:with-rust": "npm run build:rust && tsc && vite build",
     "build:rust": "napi build --platform --release --manifest-path rust/Cargo.toml --target-dir rust/target --output-dir src/infrastructure/layout/native",
     "build:rust:debug": "napi build --platform --manifest-path rust/Cargo.toml --target-dir rust/target --output-dir src/infrastructure/layout/native",
     "preview": "vite preview",
