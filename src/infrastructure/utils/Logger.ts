@@ -3,9 +3,13 @@
  *
  * Centralized logging system for the layout engine.
  * Allows enabling/disabling debug output globally.
+ *
+ * Implements ILogger interface from domain layer to respect DIP.
  */
 
-export class Logger {
+import { ILogger } from '../../domain/services/ILogger';
+
+export class Logger implements ILogger {
   private static debugEnabled: boolean = false;
 
   /**
