@@ -9,7 +9,7 @@ import { Entity } from '../../domain/entities/Entity';
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
 import { LayerClassificationEngine } from '../../domain/services/layout/LayerClassificationEngine';
-import { LayoutPositioner } from '../../domain/services/positioning/LayoutPositioner';
+import { ConnectionAwarePositioner } from '../../domain/services/positioning/ConnectionAwarePositioner';
 import { MagneticAlignmentOptimizer } from '../../domain/services/layout/MagneticAlignmentOptimizer';
 import { Logger } from '../utils/Logger';
 import { ViewportManager } from './ViewportManager';
@@ -205,18 +205,18 @@ export class CanvasRendererAdapter implements IRenderer {
     // Update entities with optimized field ordering
     this.entities = optimizedEntities;
 
-    // Step 8: Calculate positions based on optimized ordering
-    const positions = LayoutPositioner.calculatePositions(
+    // Step 8: Calculate optimal positions using connection-aware algorithm
+    const positions = ConnectionAwarePositioner.calculateOptimalPositions(
       finalLayers,
-      optimizedEntities,  // Pass optimized entities to calculate heights
+      optimizedEntities,
+      this.relationships,
       {
         entityWidth: this.entityWidth,
         entityHeaderHeight: this.entityHeaderHeight,
         entityFieldHeight: this.entityFieldHeight,
         horizontalSpacing: this.entityWidth + 120,
-        verticalSpacing: 10,  // Minimum gap between entities
-        baseX: 100,
-        displayHeight: this.displayHeight
+        minVerticalSpacing: 40,  // Increased spacing for better readability
+        baseX: 100
       }
     );
 
