@@ -1,44 +1,14 @@
 /**
  * Repository Interface: IRenderer
  *
- * Defines the contract for diagram rendering
+ * Main renderer interface - alias for IInteractiveRenderer for backward compatibility.
+ * For new implementations, prefer using IBaseRenderer, IZoomableRenderer, or IInteractiveRenderer
+ * based on the actual capabilities needed (Interface Segregation Principle).
  */
-import { Entity } from '../entities/Entity';
-import { Relationship } from '../entities/Relationship';
 
-export interface IRenderer {
-  /**
-   * Set data to render
-   */
-  setData(entities: Entity[], relationships: Relationship[]): void;
+import { IInteractiveRenderer } from './IInteractiveRenderer';
 
-  /**
-   * Render the diagram
-   */
-  render(): void;
-
-  /**
-   * Zoom in
-   */
-  zoomIn(): void;
-
-  /**
-   * Zoom out
-   */
-  zoomOut(): void;
-
-  /**
-   * Fit diagram to screen
-   */
-  fitToScreen(): void;
-
-  /**
-   * Auto-layout entities
-   */
-  autoLayout(): void;
-
-  /**
-   * Get current zoom level
-   */
-  getZoomLevel(): number;
-}
+/**
+ * @deprecated Use IBaseRenderer, IZoomableRenderer, or IInteractiveRenderer instead
+ */
+export interface IRenderer extends IInteractiveRenderer {}

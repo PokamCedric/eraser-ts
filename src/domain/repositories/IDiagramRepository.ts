@@ -1,35 +1,18 @@
 /**
  * Repository Interface: IDiagramRepository
  *
- * Defines the contract for diagram data persistence
+ * Combines parsing and persistence interfaces.
+ * For new implementations, prefer using IDSLParser and IDiagramPersistence separately
+ * to respect Interface Segregation Principle (ISP).
  */
-import { Entity } from '../entities/Entity';
-import { Relationship } from '../entities/Relationship';
 
-export interface ParseDSLResult {
-  entities: Entity[];
-  relationships: Relationship[];
-  errors: ParseError[];
-}
+import { IDSLParser, ParseError, ParseDSLResult } from './IDSLParser';
+import { IDiagramPersistence } from './IDiagramPersistence';
 
-export interface ParseError {
-  message: string;
-  line: number;
-}
+// Re-export for backward compatibility
+export type { ParseError, ParseDSLResult };
 
-export interface IDiagramRepository {
-  /**
-   * Parse DSL text and return entities and relationships
-   */
-  parseDSL(dslText: string): Promise<ParseDSLResult>;
-
-  /**
-   * Save diagram data
-   */
-  saveDiagram(data: unknown): Promise<void>;
-
-  /**
-   * Load diagram data
-   */
-  loadDiagram(): Promise<unknown>;
-}
+/**
+ * @deprecated Use IDSLParser and IDiagramPersistence separately instead
+ */
+export interface IDiagramRepository extends IDSLParser, IDiagramPersistence {}
