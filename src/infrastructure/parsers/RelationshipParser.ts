@@ -2,17 +2,20 @@
  * Relationship Parser
  *
  * Responsible for parsing relationship declarations.
- * Follows Single Responsibility Principle (SRP).
+ * Follows Single Responsibility Principle (SRP) and Open/Closed Principle (OCP).
  */
 
-import { Relationship, RelationshipType } from '../../domain/entities/Relationship';
+import { Relationship } from '../../domain/entities/Relationship';
 import { MetadataParser } from './MetadataParser';
+import { RelationshipTypeResolver } from './RelationshipTypeResolver';
 
 export class RelationshipParser {
   private metadataParser: MetadataParser;
+  private typeResolver: RelationshipTypeResolver;
 
-  constructor() {
+  constructor(typeResolver?: RelationshipTypeResolver) {
     this.metadataParser = new MetadataParser();
+    this.typeResolver = typeResolver || new RelationshipTypeResolver();
   }
 
   /**
@@ -45,8 +48,8 @@ export class RelationshipParser {
     const toField = match[5] || 'id';
     const metadataStr = match[6] || '';
 
-    // Determine relationship type based on connector
-    const type = this._resolveRelationshipType(connector);
+    // Determine relationship type based on connector (OCP: uses strategy pattern)
+    const type = this.typeResolver.resolve(connector, 'many-to-one');
 
     // Parse metadata (color, label, etc.)
     const metadata = this.metadataParser.parse(metadataStr);
@@ -64,20 +67,5 @@ export class RelationshipParser {
       color: metadata.color,
       label: metadata.label
     });
-  }
-
-  private _resolveRelationshipType(connector: string): RelationshipType {
-    switch (connector) {
-      case '<':
-        return 'one-to-many';
-      case '>':
-        return 'many-to-one';
-      case '-':
-        return 'one-to-one';
-      case '<>':
-        return 'many-to-many';
-      default:
-        return 'many-to-one';
-    }
   }
 }

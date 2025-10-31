@@ -2,12 +2,13 @@
  * Relationship Renderer
  *
  * Renders relationships (connections) between entities on canvas.
- * Follows Single Responsibility Principle (SRP).
+ * Follows Single Responsibility Principle (SRP) and Open/Closed Principle (OCP).
  */
 
 import { Relationship } from '../../domain/entities/Relationship';
 import { Position } from '../../domain/value-objects/Position';
 import { Entity } from '../../domain/entities/Entity';
+import { CardinalityRendererFactory } from './CardinalityRenderer';
 
 export interface RelationshipRenderConfig {
   entityWidth: number;
@@ -20,7 +21,11 @@ export interface RelationshipRenderConfig {
 }
 
 export class RelationshipRenderer {
-  constructor(private config: RelationshipRenderConfig) {}
+  private cardinalityFactory: CardinalityRendererFactory;
+
+  constructor(private config: RelationshipRenderConfig) {
+    this.cardinalityFactory = new CardinalityRendererFactory(config.colors.relationshipLine);
+  }
 
   /**
    * Render a relationship
@@ -106,7 +111,7 @@ export class RelationshipRenderer {
   }
 
   /**
-   * Draw cardinality markers based on relationship type
+   * Draw cardinality markers based on relationship type (OCP: uses strategy pattern)
    */
   private drawCardinalityMarkers(
     ctx: CanvasRenderingContext2D,
@@ -116,38 +121,9 @@ export class RelationshipRenderer {
     targetY: number,
     relationType: string
   ): void {
-    ctx.fillStyle = this.config.colors.relationshipLine;
-    ctx.font = '14px Arial';
-    ctx.textBaseline = 'middle';
-
-    switch (relationType) {
-      case 'one-to-one':
-        ctx.textAlign = 'left';
-        ctx.fillText('1', sourceX + 5, sourceY);
-        ctx.textAlign = 'right';
-        ctx.fillText('1', targetX - 5, targetY);
-        break;
-
-      case 'one-to-many':
-        ctx.textAlign = 'left';
-        ctx.fillText('1', sourceX + 5, sourceY);
-        ctx.textAlign = 'right';
-        ctx.fillText('*', targetX - 5, targetY);
-        break;
-
-      case 'many-to-one':
-        ctx.textAlign = 'left';
-        ctx.fillText('*', sourceX + 5, sourceY);
-        ctx.textAlign = 'right';
-        ctx.fillText('1', targetX - 5, targetY);
-        break;
-
-      case 'many-to-many':
-        ctx.textAlign = 'left';
-        ctx.fillText('*', sourceX + 5, sourceY);
-        ctx.textAlign = 'right';
-        ctx.fillText('*', targetX - 5, targetY);
-        break;
+    const renderer = this.cardinalityFactory.getRenderer(relationType as any);
+    if (renderer) {
+      renderer.render(ctx, sourceX, sourceY, targetX, targetY);
     }
   }
 }
