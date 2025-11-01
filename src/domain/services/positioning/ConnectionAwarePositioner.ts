@@ -2,7 +2,7 @@
  * Connection-Aware Positioner
  *
  * Optimizes entity positions to minimize connection crossings and length.
- * Uses a force-directed approach considering connections between entities.
+ * Uses bidirectional barycenter method with multiple passes.
  */
 
 import { Position } from '../../value-objects/Position';
@@ -18,10 +18,16 @@ export interface OptimalLayoutConfig {
   baseX: number;
 }
 
+interface EntityWithMetrics {
+  name: string;
+  height: number;
+  barycenter: number;
+}
+
 export class ConnectionAwarePositioner {
   /**
-   * Calculate optimal positions that minimize connection crossings
-   * and align connected entities vertically
+   * Calculate optimal positions using bidirectional barycenter method
+   * with multiple iterative passes
    */
   static calculateOptimalPositions(
     layers: Map<number, string[]>,
@@ -29,14 +35,9 @@ export class ConnectionAwarePositioner {
     relationships: Relationship[],
     config: OptimalLayoutConfig
   ): Map<string, Position> {
-    const positions = new Map<string, Position>();
-
     // Create entity lookup map
     const entityMap = new Map<string, Entity>();
     entities.forEach(e => entityMap.set(e.name, e));
-
-    // Build connection map (entity -> connected entities with their layers)
-    const connections = this.buildConnectionMap(layers, relationships);
 
     // Calculate height for each entity
     const entityHeights = new Map<string, number>();
@@ -45,149 +46,160 @@ export class ConnectionAwarePositioner {
       entityHeights.set(entity.name, height);
     });
 
-    // Process each layer and calculate optimal Y positions
-    const sortedLayers = Array.from(layers.entries()).sort((a, b) => a[0] - b[0]);
+    // Build adjacency lists (bidirectional)
+    const { forward, backward } = this.buildAdjacencyLists(relationships);
 
-    for (const [layerIndex, layerNodes] of sortedLayers) {
-      const x = config.baseX + layerIndex * config.horizontalSpacing;
-
-      if (layerIndex === 0) {
-        // First layer: distribute evenly
-        const yPositions = this.distributeEvenly(
-          layerNodes,
-          entityHeights,
-          config.minVerticalSpacing
-        );
-
-        layerNodes.forEach((name, i) => {
-          positions.set(name, new Position({ x, y: yPositions[i] }));
-        });
-      } else {
-        // Subsequent layers: position based on connections to previous layers
-        const yPositions = this.calculateConnectionBasedPositions(
-          layerNodes,
-          connections,
-          positions,
-          entityHeights,
-          config.minVerticalSpacing
-        );
-
-        layerNodes.forEach((name, i) => {
-          positions.set(name, new Position({ x, y: yPositions[i] }));
-        });
-      }
-    }
-
-    return positions;
-  }
-
-  /**
-   * Build a map of connections between entities
-   */
-  private static buildConnectionMap(
-    layers: Map<number, string[]>,
-    relationships: Relationship[]
-  ): Map<string, Array<{ entity: string; layer: number }>> {
-    const connections = new Map<string, Array<{ entity: string; layer: number }>>();
-
-    // Get layer for each entity
+    // Get entity to layer mapping
     const entityToLayer = new Map<string, number>();
     for (const [layerIndex, layerNodes] of layers.entries()) {
       layerNodes.forEach(node => entityToLayer.set(node, layerIndex));
     }
 
-    // Build bidirectional connection map
-    for (const rel of relationships) {
-      const fromEntity = rel.from.entity;
-      const toEntity = rel.to.entity;
-      const fromLayer = entityToLayer.get(fromEntity) ?? 0;
-      const toLayer = entityToLayer.get(toEntity) ?? 0;
+    // Initialize Y positions (temporary map for Y coordinates only)
+    const yPositions = this.initializeYPositions(layers, entityHeights, config.minVerticalSpacing);
 
-      // Add forward connection
-      if (!connections.has(fromEntity)) {
-        connections.set(fromEntity, []);
+    // Run multiple passes of barycenter optimization (alternating forward and backward)
+    const iterations = 4;
+    for (let iter = 0; iter < iterations; iter++) {
+      if (iter % 2 === 0) {
+        // Forward pass (left to right)
+        this.barycenterPass(layers, yPositions, entityHeights, forward, config.minVerticalSpacing, false);
+      } else {
+        // Backward pass (right to left)
+        this.barycenterPass(layers, yPositions, entityHeights, backward, config.minVerticalSpacing, true);
       }
-      connections.get(fromEntity)!.push({ entity: toEntity, layer: toLayer });
-
-      // Add backward connection
-      if (!connections.has(toEntity)) {
-        connections.set(toEntity, []);
-      }
-      connections.get(toEntity)!.push({ entity: fromEntity, layer: fromLayer });
     }
 
-    return connections;
+    // Convert Y positions to final Position objects with X coordinates
+    return this.convertToPositions(layers, yPositions, config);
   }
 
   /**
-   * Distribute entities evenly for the first layer
+   * Build adjacency lists for forward and backward connections
    */
-  private static distributeEvenly(
-    entities: string[],
+  private static buildAdjacencyLists(
+    relationships: Relationship[]
+  ): { forward: Map<string, string[]>; backward: Map<string, string[]> } {
+    const forward = new Map<string, string[]>();
+    const backward = new Map<string, string[]>();
+
+    for (const rel of relationships) {
+      const from = rel.from.entity;
+      const to = rel.to.entity;
+
+      // Forward: from -> to
+      if (!forward.has(from)) forward.set(from, []);
+      forward.get(from)!.push(to);
+
+      // Backward: to -> from
+      if (!backward.has(to)) backward.set(to, []);
+      backward.get(to)!.push(from);
+    }
+
+    return { forward, backward };
+  }
+
+  /**
+   * Initialize Y positions with even distribution
+   */
+  private static initializeYPositions(
+    layers: Map<number, string[]>,
     entityHeights: Map<string, number>,
     minSpacing: number
-  ): number[] {
-    const positions: number[] = [];
-    let currentY = 100; // Start padding
+  ): Map<string, number> {
+    const yPositions = new Map<string, number>();
 
-    entities.forEach(name => {
-      positions.push(currentY);
-      const height = entityHeights.get(name) ?? 100;
-      currentY += height + minSpacing;
-    });
+    for (const [_, layerNodes] of layers.entries()) {
+      let currentY = 100;
+
+      for (const name of layerNodes) {
+        yPositions.set(name, currentY);
+        const height = entityHeights.get(name) ?? 100;
+        currentY += height + minSpacing;
+      }
+    }
+
+    return yPositions;
+  }
+
+  /**
+   * Perform one barycenter pass (forward or backward)
+   */
+  private static barycenterPass(
+    layers: Map<number, string[]>,
+    yPositions: Map<string, number>,
+    entityHeights: Map<string, number>,
+    adjacency: Map<string, string[]>,
+    minSpacing: number,
+    reverse: boolean
+  ): void {
+    const sortedLayers = Array.from(layers.entries()).sort((a, b) => a[0] - b[0]);
+    if (reverse) sortedLayers.reverse();
+
+    for (const [_, layerNodes] of sortedLayers) {
+      const entitiesWithBarycenters: EntityWithMetrics[] = [];
+
+      for (const name of layerNodes) {
+        const neighbors = adjacency.get(name) || [];
+
+        if (neighbors.length > 0) {
+          // Calculate barycenter (average Y position of connected entities)
+          const sum = neighbors.reduce((s, neighbor) => {
+            const pos = yPositions.get(neighbor);
+            const height = entityHeights.get(neighbor) ?? 100;
+            // Use center of entity for barycenter calculation
+            return s + (pos !== undefined ? pos + height / 2 : 0);
+          }, 0);
+          const barycenter = sum / neighbors.length;
+
+          entitiesWithBarycenters.push({
+            name,
+            height: entityHeights.get(name) ?? 100,
+            barycenter
+          });
+        } else {
+          // Keep current position if no neighbors
+          entitiesWithBarycenters.push({
+            name,
+            height: entityHeights.get(name) ?? 100,
+            barycenter: yPositions.get(name) ?? 100
+          });
+        }
+      }
+
+      // Sort by barycenter
+      entitiesWithBarycenters.sort((a, b) => a.barycenter - b.barycenter);
+
+      // Assign new positions avoiding overlaps
+      let currentY = 100;
+      for (const entity of entitiesWithBarycenters) {
+        const idealY = entity.barycenter - entity.height / 2;
+        const actualY = Math.max(idealY, currentY);
+        yPositions.set(entity.name, actualY);
+        currentY = actualY + entity.height + minSpacing;
+      }
+    }
+  }
+
+  /**
+   * Convert Y positions map to Position objects with X coordinates
+   */
+  private static convertToPositions(
+    layers: Map<number, string[]>,
+    yPositions: Map<string, number>,
+    config: OptimalLayoutConfig
+  ): Map<string, Position> {
+    const positions = new Map<string, Position>();
+
+    for (const [layerIndex, layerNodes] of layers.entries()) {
+      const x = config.baseX + layerIndex * config.horizontalSpacing;
+
+      for (const name of layerNodes) {
+        const y = yPositions.get(name) ?? 100;
+        positions.set(name, new Position({ x, y }));
+      }
+    }
 
     return positions;
-  }
-
-  /**
-   * Calculate positions based on connections to already-positioned entities
-   */
-  private static calculateConnectionBasedPositions(
-    layerNodes: string[],
-    connections: Map<string, Array<{ entity: string; layer: number }>>,
-    existingPositions: Map<string, Position>,
-    entityHeights: Map<string, number>,
-    minSpacing: number
-  ): number[] {
-    // Calculate ideal Y position for each entity based on its connections
-    const idealPositions: Array<{ name: string; idealY: number }> = [];
-
-    for (const name of layerNodes) {
-      const connectedEntities = connections.get(name) || [];
-
-      // Filter to only already-positioned entities
-      const positionedConnections = connectedEntities
-        .map(conn => existingPositions.get(conn.entity))
-        .filter(pos => pos !== undefined) as Position[];
-
-      if (positionedConnections.length > 0) {
-        // Calculate center Y of connected entities
-        const avgY = positionedConnections.reduce((sum, pos) => sum + pos.y, 0) / positionedConnections.length;
-        idealPositions.push({ name, idealY: avgY });
-      } else {
-        // No connections yet, use default
-        idealPositions.push({ name, idealY: 100 });
-      }
-    }
-
-    // Sort by ideal Y position
-    idealPositions.sort((a, b) => a.idealY - b.idealY);
-
-    // Assign actual positions avoiding overlaps
-    const actualPositions = new Map<string, number>();
-    let currentY = 100;
-
-    for (const { name, idealY } of idealPositions) {
-      const height = entityHeights.get(name) ?? 100;
-
-      // Use ideal Y if it doesn't cause overlap, otherwise use currentY
-      const y = Math.max(idealY, currentY);
-      actualPositions.set(name, y);
-
-      currentY = y + height + minSpacing;
-    }
-
-    // Return positions in original order
-    return layerNodes.map(name => actualPositions.get(name) ?? 100);
   }
 }
