@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "Real-time Entity Relationship Diagram Generator with DSL - TypeScript Edition",
   "type": "module",
+  "exports": {
+    "./src/infrastructure/parsers/DSLParserAdapter.ts": "./src/infrastructure/parsers/DSLParserAdapter.ts",
+    "./src/infrastructure/renderers/CanvasRendererAdapter.ts": "./src/infrastructure/renderers/CanvasRendererAdapter.ts",
+    "./src/application/use-cases/ParseDSLUseCase.ts": "./src/application/use-cases/ParseDSLUseCase.ts",
+    "./src/infrastructure/renderers/IconLoader.ts": "./src/infrastructure/renderers/IconLoader.ts"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
