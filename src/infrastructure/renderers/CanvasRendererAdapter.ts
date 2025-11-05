@@ -97,10 +97,17 @@ export class CanvasRendererAdapter implements IRenderer {
       .filter(icon => icon && icon !== 'box');
 
     if (iconNames.length > 0) {
-      IconLoader.preload(iconNames).then(() => {
-        // Re-render after icons are loaded
-        this.render();
-      });
+      IconLoader.preload(iconNames)
+        .then(() => {
+          // Re-render after icons are loaded
+          this.render();
+        })
+        .catch(() => {
+          // Silently ignore icon loading errors
+          // Errors are already logged in IconLoader
+          // Still render even if some icons failed to load
+          this.render();
+        });
     }
 
     // Apply auto-layout automatically if there are entities

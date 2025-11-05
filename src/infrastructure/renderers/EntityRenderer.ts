@@ -57,14 +57,20 @@ export class EntityRenderer {
     ctx.fillStyle = entity.color || '#3b82f6';
     ctx.fillRect(x, y, width, headerHeight);
 
-    // Icon (SVG from Lucide Icons or emoji fallback)
+    // Icon (SVG from Lucide Icons - only display if loaded successfully)
     let iconRendered = false;
     if (entity.icon && entity.icon !== 'box') {
       // Try to load SVG icon
       if (!this.iconsLoaded.has(entity.icon)) {
-        IconLoader.load(entity.icon).then(() => {
-          this.iconsLoaded.add(entity.icon);
-        });
+        IconLoader.load(entity.icon)
+          .then(() => {
+            this.iconsLoaded.add(entity.icon);
+          })
+          .catch(() => {
+            // Silently ignore icon loading errors
+            // Error is already logged in IconLoader
+            // Icon won't be displayed if it fails to load
+          });
       }
 
       const iconImg = IconLoader.getCached(entity.icon);
@@ -79,15 +85,8 @@ export class EntityRenderer {
         ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
         ctx.restore();
         iconRendered = true;
-      } else {
-        // Fallback: render as emoji/text if available
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '20px -apple-system, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(entity.icon, x + 12, y + headerHeight / 2);
-        iconRendered = true;
       }
+      // No fallback - if icon fails to load, don't display anything
     }
 
     // Entity name (offset if icon present)
