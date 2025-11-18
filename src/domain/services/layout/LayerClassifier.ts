@@ -420,7 +420,9 @@ export class LayerClassifier implements ILayerClassifier {
    */
   private parseKey(key: string): [string, string] {
     const parts = key.split('→');
-    return [parts[0], parts[1]];
+    const left = parts[0] ?? '';
+    const right = parts[1] ?? '';
+    return [left, right];
   }
 
   /**

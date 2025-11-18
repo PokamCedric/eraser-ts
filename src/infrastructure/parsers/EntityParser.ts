@@ -37,7 +37,7 @@ export class EntityParser {
     const entityMatch = line.match(/^(\w+)\s*(\[([^\]]+)\])?\s*\{/);
     if (!entityMatch) return null;
 
-    const entityName = entityMatch[1];
+    const entityName = entityMatch[1] ?? '';
     const metadataStr = entityMatch[3] || '';
     const metadata = this.metadataParser.parse(metadataStr);
 

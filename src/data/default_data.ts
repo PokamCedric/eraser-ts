@@ -6,7 +6,7 @@
 
 export let DEFAULT_DSL = ''; // assigned below after DSL_CRM is defined
 
-const DSL_1 = `
+DEFAULT_DSL = `
 // Comprehensive Relationships Demo
 // This example demonstrates all relationship types and features
 
@@ -174,7 +174,7 @@ projects.id < posts.authorId
 comments.userId > users.id
 `.trim();
 
-DEFAULT_DSL =`
+const DEFAULT_DSL2 =`
 
 // ---------- CRM: Comprehensive DSL (Complex) ----------
 // Entities, fields, metadata, indices, enums, junctions, and relationships

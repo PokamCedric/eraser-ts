@@ -100,7 +100,11 @@ export class GraphPreprocessor {
     const listeEnonces: string[] = [];
 
     // ITERATION 1: Take the first element (most connected)
-    entityOrder.push(listeRegle1[0]);
+    const firstEntity = listeRegle1[0];
+    if (!firstEntity) {
+      return entityOrder; // Return empty if no entities
+    }
+    entityOrder.push(firstEntity);
 
     // Add connected entities
     for (const { left, right } of relations) {

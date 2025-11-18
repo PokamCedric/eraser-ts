@@ -23,8 +23,8 @@ export class FieldParser {
     const match = line.match(/^(\w+)\s+(\w+)(.*)$/);
     if (!match) return null;
 
-    const fieldName = match[1];
-    const fieldType = match[2];
+    const fieldName = match[1] ?? '';
+    const fieldType = match[2] ?? 'string';
     const decoratorsStr = match[3] || '';
 
     const decorators = this.decoratorParser.parse(decoratorsStr);

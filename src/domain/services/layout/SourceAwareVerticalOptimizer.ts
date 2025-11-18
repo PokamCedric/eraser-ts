@@ -57,7 +57,10 @@ export class SourceAwareVerticalOptimizer implements IVerticalOptimizer {
 
     // Last layer: order by entity_order
     const lastIdx = layers.length - 1;
-    layers[lastIdx] = this.orderByEntityOrder(layers[lastIdx], entityOrder);
+    const lastLayer = layers[lastIdx];
+    if (lastLayer) {
+      layers[lastIdx] = this.orderByEntityOrder(lastLayer, entityOrder);
+    }
 
     this.logger.debug(`\nLast layer ${lastIdx}: ordered by connectivity`);
     this.logger.debug(`  ${JSON.stringify(layers[lastIdx])}`);
@@ -68,11 +71,13 @@ export class SourceAwareVerticalOptimizer implements IVerticalOptimizer {
       const prevLayer = layerIdx > 0 ? layers[layerIdx - 1] : [];
       const nextLayer = layers[layerIdx + 1];
 
+      if (!currentLayer || !nextLayer) continue;
+
       this.logger.subsection(`Processing Layer ${layerIdx}`);
 
       const orderedLayer = this.orderBySourceChains(
         currentLayer,
-        prevLayer,
+        prevLayer || [],
         nextLayer,
         entityOrder
       );

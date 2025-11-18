@@ -41,10 +41,10 @@ export class RelationshipParser {
 
     if (!match) return null;
 
-    const fromEntity = match[1];
+    const fromEntity = match[1] ?? '';
     const fromField = match[2] || 'id';
-    const connector = match[3];
-    const toEntity = match[4];
+    const connector = match[3] ?? '';
+    const toEntity = match[4] ?? '';
     const toField = match[5] || 'id';
     const metadataStr = match[6] || '';
 

@@ -23,7 +23,7 @@ export class DecoratorParser {
     let match: RegExpExecArray | null;
 
     while ((match = regex.exec(decoratorsStr)) !== null) {
-      const name = match[1];
+      const name = match[1] ?? '';
       const argsStr = match[2];
 
       let args: string | null = null;

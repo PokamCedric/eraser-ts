@@ -77,6 +77,8 @@ export class CrossingMinimizer implements ICrossingMinimizer {
         const prevLayer = currentLayers[layerIdx - 1];
         const currentLayer = currentLayers[layerIdx];
 
+        if (!prevLayer || !currentLayer) continue;
+
         const reordered = this.reorderByBarycenterBackward(
           currentLayer,
           prevLayer
@@ -88,6 +90,8 @@ export class CrossingMinimizer implements ICrossingMinimizer {
       for (let layerIdx = currentLayers.length - 2; layerIdx >= 0; layerIdx--) {
         const currentLayer = currentLayers[layerIdx];
         const nextLayer = currentLayers[layerIdx + 1];
+
+        if (!currentLayer || !nextLayer) continue;
 
         const reordered = this.reorderByBarycenterForward(
           currentLayer,
@@ -221,6 +225,8 @@ export class CrossingMinimizer implements ICrossingMinimizer {
     const edges: Array<[number, number]> = [];
     for (let leftIdx = 0; leftIdx < leftLayer.length; leftIdx++) {
       const leftEntity = leftLayer[leftIdx];
+      if (!leftEntity) continue;
+
       const targets = this.forwardEdges.get(leftEntity);
       if (targets) {
         for (const rightEntity of targets) {
@@ -235,8 +241,12 @@ export class CrossingMinimizer implements ICrossingMinimizer {
     // Count crossings: for each pair of edges, check if they cross
     for (let i = 0; i < edges.length; i++) {
       for (let j = i + 1; j < edges.length; j++) {
-        const [left1, right1] = edges[i];
-        const [left2, right2] = edges[j];
+        const edge1 = edges[i];
+        const edge2 = edges[j];
+        if (!edge1 || !edge2) continue;
+
+        const [left1, right1] = edge1;
+        const [left2, right2] = edge2;
 
         // Edges cross if their order is inverted
         if ((left1 < left2 && right1 > right2) || (left1 > left2 && right1 < right2)) {
@@ -254,7 +264,11 @@ export class CrossingMinimizer implements ICrossingMinimizer {
   private countTotalCrossings(layers: string[][]): number {
     let total = 0;
     for (let i = 0; i < layers.length - 1; i++) {
-      const crossings = this.countCrossingsBetweenLayers(layers[i], layers[i + 1]);
+      const leftLayer = layers[i];
+      const rightLayer = layers[i + 1];
+      if (!leftLayer || !rightLayer) continue;
+
+      const crossings = this.countCrossingsBetweenLayers(leftLayer, rightLayer);
       total += crossings;
     }
     return total;

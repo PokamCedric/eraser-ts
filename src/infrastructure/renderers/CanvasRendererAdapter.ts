@@ -39,7 +39,7 @@ export class CanvasRendererAdapter implements IRenderer {
   private viewportManager: ViewportManager;
   private entityRenderer: EntityRenderer;
   private relationshipRenderer: RelationshipRenderer;
-  // @ts-expect-error - Kept to prevent garbage collection and maintain event listeners
+  // Kept to prevent garbage collection and maintain event listeners
   private interactionHandler: CanvasInteractionHandler;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -278,6 +278,8 @@ export class CanvasRendererAdapter implements IRenderer {
   private _getEntityAtPoint(x: number, y: number): Entity | null {
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const entity = this.entities[i];
+      if (!entity) continue;
+
       const pos = this.entityPositions.get(entity.name);
       if (!pos) continue;
 
